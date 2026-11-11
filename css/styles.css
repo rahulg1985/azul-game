@@ -579,15 +579,21 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 /* Opponent boards render in full, at the same size as the active board,
    so the whole screen is used. */
 .board.compact .board-name { font-size: .95rem; }
-@media (min-width: 769px) {
+/* Two boards per row only on wide HORIZONTAL screens. On a vertical
+   (portrait) tablet the boards follow the normal responsive rules —
+   one full-width board per row — because a board's tiles cannot
+   shrink below their minimum size and a forced second column pushed
+   the second board half off the screen. */
+@media (min-width: 769px) and (orientation: landscape) {
   .boards { grid-template-columns: 1fr 1fr; }
   .board.turn { grid-column: 1 / -1; }
 }
 /* Desktop and tablet landscape: every board takes one equal grid cell —
    no full-width turn board, no 600px cap — so all boards are the same
    size, two per row. The min-height guard leaves the landscape-phone
-   layout (max-height 540px, active board spans its column) untouched. */
-@media (min-width: 769px) and (min-height: 541px) {
+   layout (max-height 540px, active board spans its column) untouched,
+   and portrait tablets keep the single-column responsive layout. */
+@media (min-width: 769px) and (min-height: 541px) and (orientation: landscape) {
   .board.turn { grid-column: auto; }
   .board { max-width: none; margin-inline: 0; }
 }
