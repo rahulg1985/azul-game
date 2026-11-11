@@ -1086,7 +1086,7 @@
 
     var clones = [];
     var FLIGHT_MS = 1150;
-    tiles.forEach(function (t, i) {
+    function spawnFlight(t, ex, ey, delay) {
       var r = t.getBoundingClientRect();
       var clone = t.cloneNode(true);
       clone.classList.add('fly-tile');
@@ -1098,8 +1098,6 @@
       clones.push(clone);
       var sx = r.left + r.width / 2;
       var sy = r.top + r.height / 2;
-      var ex = spots[i].x;
-      var ey = spots[i].y;
       // Circular motion: a quadratic arc bulging down-right, with the
       // tile making a full turn as it travels.
       var cx = Math.max(sx, ex) + 110;
@@ -1117,16 +1115,39 @@
         });
       }
       clone.animate(frames, {
-        duration: FLIGHT_MS, delay: i * 90, easing: 'ease-in-out', fill: 'forwards'
+        duration: FLIGHT_MS, delay: delay, easing: 'ease-in-out', fill: 'forwards'
       });
-    });
+    }
+    tiles.forEach(function (t, i) { spawnFlight(t, spots[i].x, spots[i].y, i * 90); });
+
+    // The factory's leftover tiles fly to the center pile at the same
+    // time, fanning into the middle of the pile.
+    var leftoverCount = 0;
+    if (selection.source.kind === 'factory') {
+      var srcGroup = tiles[0].closest('.tile-group');
+      var factoryEl = srcGroup && srcGroup.closest('.factory');
+      var centerEl = $('#center-pile');
+      if (factoryEl && centerEl) {
+        var cr = centerEl.getBoundingClientRect();
+        var leftTiles = [];
+        factoryEl.querySelectorAll('.tile-group:not(.selected) .tile')
+          .forEach(function (t) { leftTiles.push(t); });
+        leftoverCount = leftTiles.length;
+        leftTiles.forEach(function (t, j) {
+          var ex = cr.left + cr.width / 2 +
+            (j - (leftTiles.length - 1) / 2) * (cr.width > 140 ? 26 : 12);
+          var ey = cr.top + cr.height / 2;
+          spawnFlight(t, ex, ey, j * 90);
+        });
+      }
+    }
     // Land -> the move applies at once (tiles take their real positions,
     // selection clears) -> renderGame holds the turn switch for 1s.
     setTimeout(function () {
       clones.forEach(function (c) { c.remove(); });
       holdNextSwitch = true;
       attemptMove(dest);
-    }, FLIGHT_MS + (tiles.length - 1) * 90);
+    }, FLIGHT_MS + (Math.max(tiles.length, leftoverCount) - 1) * 90);
   }
 
   function attemptMove(dest) {
