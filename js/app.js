@@ -1473,13 +1473,34 @@
           : '· Off';
       }
       if (members) {
+        // Every player's name carries two icons: mic (are they talking
+        // or not) and speaker (are they listening or not). On my own
+        // chip they are working buttons; on other players they show
+        // that player's synced state.
         members.innerHTML = snap.members.length ? snap.members.map(function (m) {
-          return '<span class="voice-chip' + (m.speaking ? ' speaking' : '') +
-            (m.muted ? ' is-muted' : '') + '">' +
-            (m.speaking ? '🔊 ' : '🎙️ ') + esc(m.name) + (m.me ? ' (you)' : '') +
-            (m.muted ? ' 🔇' : '') +
-            (!m.mic ? ' · Mic blocked' : '') +
-            (!m.me && snap.active && m.mic && !m.connected ? ' · Connecting…' : '') +
+          var micOff = !m.mic || m.muted;
+          var spkOff = m.speaker === false;
+          var micHtml, spkHtml;
+          if (m.me) {
+            micHtml = '<button type="button" class="vchip-btn btn-voice-mute' + (micOff ? ' off' : '') +
+              '" title="' + (!m.mic ? 'Enable microphone' : (m.muted ? 'Unmute microphone' : 'Mute microphone')) +
+              '" aria-label="My microphone">' + (micOff ? ICON_MIC_OFF : ICON_MIC) + '</button>';
+            spkHtml = '<button type="button" class="vchip-btn btn-voice-speaker' + (spkOff ? ' off' : '') +
+              '" title="' + (spkOff ? 'Turn speaker on' : 'Turn speaker off') +
+              '" aria-label="My speaker">' + (spkOff ? ICON_SPK_OFF : ICON_SPK) + '</button>';
+          } else {
+            micHtml = '<span class="vchip-ic' + (micOff ? ' off' : '') +
+              '" title="' + (!m.mic ? 'Mic blocked' : (m.muted ? 'Mic off' : 'Mic on')) + '">' +
+              (micOff ? ICON_MIC_OFF : ICON_MIC) + '</span>';
+            spkHtml = '<span class="vchip-ic' + (spkOff ? ' off' : '') +
+              '" title="' + (spkOff ? 'Speaker off — not listening' : 'Speaker on — listening') + '">' +
+              (spkOff ? ICON_SPK_OFF : ICON_SPK) + '</span>';
+          }
+          return '<span class="voice-chip' + (m.speaking ? ' speaking' : '') + '">' +
+            '<span class="voice-chip-name">' + esc(m.name) + (m.me ? ' (you)' : '') + '</span>' +
+            micHtml + spkHtml +
+            (!m.mic ? '<span class="voice-chip-note">Mic blocked</span>' : '') +
+            (!m.me && snap.active && m.mic && !m.connected ? '<span class="voice-chip-note">Connecting…</span>' : '') +
             '</span>';
         }).join('') : '<span class="voice-none">No one in voice yet</span>';
       }
@@ -1525,7 +1546,20 @@
       var V = window.AzulVoice;
       if (!V || !ev.target.closest) return;
       if (ev.target.closest('.btn-voice-mute')) {
-        V.setMuted(!V.snapshot().muted);
+        var snapM = V.snapshot();
+        if (!snapM.hasMic) {
+          // No mic yet (blocked or still joining): the mic button acts
+          // as Enable Voice and retries the microphone.
+          if (session && session.mode === 'online' && !snapM.joining) {
+            voiceOptOut = false;
+            V.unlockAudio();
+            V.join(session.code, session.playerIdx, session.myName)
+              .catch(function (err) { toast(err.message || 'Microphone unavailable', true); });
+            renderVoice();
+          }
+          return;
+        }
+        V.setMuted(!snapM.muted);
         return;
       }
       if (ev.target.closest('.btn-voice-speaker')) {

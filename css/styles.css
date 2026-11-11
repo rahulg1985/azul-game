@@ -667,13 +667,34 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
   background: rgba(255, 255, 255, .10);
   border: 1.5px solid transparent;
   border-radius: 999px;
-  padding: 3px 10px;
+  padding: 3px 6px 3px 10px;
   font-size: .85rem;
   font-weight: 600;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 .voice-chip.speaking { border-color: #43d17c; box-shadow: 0 0 10px rgba(67, 209, 124, .45); }
-.voice-chip.is-muted { opacity: .55; }
+.voice-chip-name { white-space: nowrap; }
+.voice-chip-note { color: var(--ink-dim); font-size: .76rem; font-weight: 600; }
+/* Per-player mic/speaker icons inside a chip: real buttons on my own
+   chip, status indicators on everyone else's. Red tint = off. */
+.vchip-btn, .vchip-ic {
+  width: 26px; height: 26px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; padding: 0;
+}
+.vchip-btn {
+  border: 1px solid rgba(255, 255, 255, .25);
+  background: rgba(255, 255, 255, .14); color: #fff; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.vchip-btn:active { transform: scale(.92); }
+.vchip-ic { color: #bfe3cd; }
+.vchip-btn svg, .vchip-ic svg { width: 15px; height: 15px; display: block; }
+.vchip-btn.off { background: #d93025; border-color: #d93025; color: #fff; }
+.vchip-ic.off { color: #ff8a7a; }
 .voice-none { color: var(--ink-dim); font-size: .88rem; padding: 3px 0; white-space: nowrap; }
 .voice-controls { display: flex; gap: 12px; align-items: center; margin-left: auto; }
 /* WhatsApp-style call buttons: one round button per feature, icon shows

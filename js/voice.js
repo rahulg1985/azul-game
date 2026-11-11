@@ -91,6 +91,7 @@
         name: S.members[k].name,
         muted: !!S.members[k].muted,
         mic: S.members[k].mic !== false,
+        speaker: S.members[k].speaker !== false,
         speaking: !!S.speaking[idx],
         connected: !!pc && pc.connectionState === 'connected',
         me: idx === S.myIdx
@@ -101,6 +102,7 @@
       if (!haveMe) {
         members.push({
           idx: S.myIdx, name: S.myName, muted: S.muted, mic: !!S.stream,
+          speaker: S.speakerOn,
           speaking: !!S.speaking.me, connected: true, me: true
         });
         members.sort(function (a, b) { return a.idx - b.idx; });
@@ -130,6 +132,7 @@
     vRef('members/' + S.myIdx).update({
       muted: S.muted,
       mic: !!S.stream,
+      speaker: S.speakerOn,
       ts: window.firebase.database.ServerValue.TIMESTAMP
     }).catch(function () { /* ignore */ });
   }
@@ -380,6 +383,7 @@
       var el = S.audioEls[k];
       if (el) el.muted = S.routed[k] ? true : !S.speakerOn;
     });
+    if (S.active) heartbeat(); // others see my speaker state in their list
     emit();
   }
 
@@ -442,7 +446,7 @@
         S.active = true;
         var myRef = vRef('members/' + myIdx);
         await myRef.set({
-          name: myName, muted: S.muted, mic: false,
+          name: myName, muted: S.muted, mic: false, speaker: S.speakerOn,
           ts: window.firebase.database.ServerValue.TIMESTAMP
         });
         if (seq !== S.joinSeq) return;
