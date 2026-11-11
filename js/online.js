@@ -266,6 +266,12 @@
     }
   }
 
+  // Host taps on the celebration screen: flag it so every player
+  // leaves the celebration and returns home together.
+  function endCelebration(code) {
+    return roomRef(code).child('meta/celebrationDone').set(true);
+  }
+
   window.AzulOnline = {
     init: init,
     isReady: isReady,
@@ -274,6 +280,7 @@
     watchRoom: watchRoom,
     startGame: startGame,
     submitMove: submitMove,
+    endCelebration: endCelebration,
     leaveRoom: leaveRoom,
     storedSeat: storedSeat,
     saveSeat: saveSeat,

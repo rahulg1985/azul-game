@@ -96,6 +96,7 @@
   var lastAnnouncedRound = null; // round-end pause/dictation handled up to this round
   var startAnnouncedKey = null; // game-start announcement already spoken for this game
   var finalAnnouncedKey = null;  // score signature of the last announced game-over
+  var celebrating = false;       // winner celebration overlay is showing
   var roundOverlayTimer = null;
 
   // ---------------------------------------------------------- sound & voice --
@@ -186,6 +187,24 @@
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
     src.connect(bp); bp.connect(g); g.connect(ctx.destination);
     src.start(t); src.stop(t + dur + 0.05);
+  }
+
+  // Short celebratory chime when the winner celebration opens.
+  function playFanfare() {
+    if (!ensureAudio()) return;
+    var ctx = audioCtx;
+    [523.25, 659.25, 783.99, 1046.5].forEach(function (f, i) {
+      var t = ctx.currentTime + i * 0.13;
+      var osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.value = f;
+      var g = ctx.createGain();
+      g.gain.setValueAtTime(0.001, t);
+      g.gain.exponentialRampToValueAtTime(0.22, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      osc.connect(g); g.connect(ctx.destination);
+      osc.start(t); osc.stop(t + 0.55);
+    });
   }
 
   // Firecracker pop + crackle for the winner celebration.
@@ -480,8 +499,12 @@
       if (session.state.lastResolve) setHighlightFromResolve(session.state);
     }
     if (session.state.phase === 'finished') {
-      renderGameOver();
-      show('screen-gameover');
+      if (room.meta && room.meta.celebrationDone) {
+        // The host tapped the celebration away: everyone goes home.
+        if (celebrating) { dismissCelebration(); leaveRoomWatch(); goHome(); }
+        return;
+      }
+      enterCelebration();
       return;
     }
     if (selection && session.state.currentPlayer !== session.playerIdx) selection = null;
@@ -881,6 +904,21 @@
   function wireGame() {
     $('#round-overlay').addEventListener('click', dismissRoundOverlay);
 
+    $('#celebration').addEventListener('click', function () {
+      if (!celebrating || !session) return;
+      if (session.mode === 'online') {
+        var isHost = session.roomMeta &&
+          session.playerIdx === session.roomMeta.hostIdx;
+        if (!isHost) { toast('Waiting for the host to tap…'); return; }
+        if (window.AzulOnline.endCelebration) {
+          window.AzulOnline.endCelebration(session.code);
+        }
+        leaveRoomWatch();
+      }
+      dismissCelebration();
+      goHome();
+    });
+
     $('#screen-game').addEventListener('click', function (ev) {
       if (!session || !session.state) return;
       if (flying) return; // tiles are mid-flight; ignore game taps
@@ -1055,8 +1093,7 @@
           session.state = window.AzulEngine.normalize(newState);
           if (newState.phase === 'finished') {
             if (newState.lastResolve) setHighlightFromResolve(newState);
-            renderGameOver();
-            show('screen-gameover');
+            enterCelebration();
           } else {
             renderGame();
           }
@@ -1069,8 +1106,7 @@
     var s = session.state;
     if (s.phase === 'finished') {
       if (s.lastResolve) setHighlightFromResolve(s);
-      renderGameOver();
-      show('screen-gameover');
+      enterCelebration();
       return;
     }
     if (s.round !== prevRound && s.lastResolve) {
@@ -1268,7 +1304,6 @@
   }
 
   function startCelebration() {
-    if (REDUCED_MOTION) return;
     var cv = $('#fireworks');
     if (!cv || fw.running) return;
     var ctx = cv.getContext('2d');
@@ -1280,7 +1315,7 @@
     fw.parts = [];
     fw.rockets = [];
     fw.lastLaunch = 0;
-    fw.endAt = Date.now() + 7000;
+    fw.endAt = Infinity; // runs until the celebration is tapped away
     var loop = function (ts) {
       if (!fw.running) return;
       ctx.clearRect(0, 0, cv.width, cv.height);
@@ -1342,6 +1377,64 @@
   }
 
   // ------------------------------------------------------------ game over --
+  // Game over: celebrate OVER the game screen — a transparent veil with
+  // the congratulations gif and continuous fireworks (with pops), every
+  // player's board visible below sorted by score. It stays until a tap
+  // (online: the host's tap ends it for everyone) and then goes home.
+  function enterCelebration() {
+    var s = session.state;
+    if (!s || s.phase !== 'finished' || celebrating) return;
+    celebrating = true;
+    selection = null;
+    show('screen-game');
+    $('#screen-game').classList.add('game-over-mode');
+    window.scrollTo(0, 0);
+
+    var winnerNames = s.winners.map(function (i) { return s.players[i].name; });
+    var title = s.winners.length === 1
+      ? '🏆 ' + winnerNames[0] + ' wins!'
+      : '🏆 It’s a tie — ' + winnerNames.join(' & ') + ' win!';
+    var scoresLine = s.players.map(function (p) {
+      return p.name + ' ★ ' + p.score;
+    }).join(' · ');
+    $('#turn-banner').innerHTML =
+      '<div class="turn-main">' + esc(title) + '</div>' +
+      '<div class="turn-sub">Final scores — ' + esc(scoresLine) + '</div>';
+
+    var order = s.players.map(function (_, i) { return i; })
+      .sort(function (a, b) { return s.players[b].score - s.players[a].score; });
+    $('#boards').innerHTML = order.map(function (pi) {
+      return boardHtml(s, pi).replace('board turn', 'board');
+    }).join('');
+
+    var isOnline = session.mode === 'online';
+    var isHost = !isOnline ||
+      (session.roomMeta && session.playerIdx === session.roomMeta.hostIdx);
+    $('#celebration-title').textContent = title;
+    $('#celebration-sub').textContent = isOnline && !isHost
+      ? 'Waiting for the host to tap…'
+      : 'Tap anywhere to go back home';
+    $('#celebration').classList.remove('hidden');
+
+    var finalKey = s.players.map(function (p) { return p.score; }).join(',') +
+      '|' + s.winners.join(',');
+    if (finalAnnouncedKey !== finalKey) {
+      finalAnnouncedKey = finalKey;
+      announceFinalScores(s);
+      playFanfare();
+    }
+    startCelebration();
+  }
+
+  function dismissCelebration() {
+    celebrating = false;
+    stopCelebration();
+    var ov = $('#celebration');
+    if (ov) ov.classList.add('hidden');
+    var gameEl = $('#screen-game');
+    if (gameEl) gameEl.classList.remove('game-over-mode');
+  }
+
   function renderGameOver() {
     var s = session.state;
     var finalKey = s.players.map(function (p) { return p.score; }).join(',') +
@@ -1410,6 +1503,7 @@
   function goHome() {
     if (window.AzulVoice) window.AzulVoice.leave();
     dismissRoundOverlay();
+    dismissCelebration();
     stopCelebration();
     try { window.sessionStorage.removeItem('azul-session'); } catch (e) { /* ignore */ }
     show('screen-home');
