@@ -727,7 +727,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 
 /* ------------------------------------------------------------- fullscreen */
 .fs-btn {
-  display: none; /* revealed only during gameplay (body.in-game) */
+  display: flex; /* visible on every screen; JS hides it in standalone mode */
   position: fixed;
   right: calc(10px + env(safe-area-inset-right));
   bottom: calc(10px + env(safe-area-inset-bottom));
@@ -743,8 +743,30 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
   justify-content: center;
   backdrop-filter: blur(2px);
 }
-body.in-game .fs-btn { display: flex; }
-body.in-game .fs-btn.hidden { display: none; /* JS hides it when unsupported */ }
+.fs-btn.hidden { display: none; }
+
+/* Full-screen help (shown where page fullscreen isn't available). */
+.fs-help {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(4, 8, 16, .72);
+  display: flex; align-items: center; justify-content: center;
+  padding: 18px;
+}
+.fs-help.hidden { display: none; }
+.fs-help-card {
+  background: var(--card, #12233c);
+  border: 1px solid var(--line, #2b4365);
+  border-radius: 14px;
+  padding: 20px 22px;
+  max-width: 420px;
+  color: var(--ink, #eef3fa);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .55);
+}
+.fs-help-card h2 { margin: 0 0 8px; font-size: 1.25rem; }
+.fs-help-card p { margin: 0 0 10px; line-height: 1.5; }
+.fs-help-card ol { margin: 0 0 16px; padding-left: 22px; line-height: 1.55; }
+.fs-help-card li { margin: 4px 0; }
+.fs-help-card .btn { width: 100%; }
 
 /* ------------------------------------------------- landscape phones ----- */
 @media (orientation: landscape) and (max-height: 540px) {

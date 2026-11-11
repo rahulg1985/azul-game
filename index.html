@@ -5,7 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Azul — Tile Game</title>
 <meta name="description" content="Azul tile game — play locally with friends on one device, or online by sharing a room link.">
-<link rel="stylesheet" href="css/styles.css?v=40">
+<meta name="theme-color" content="#0b1220">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Azul">
+<link rel="apple-touch-icon" href="assets/logo.jpg">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="css/styles.css?v=41">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%232f6fd0'/><rect x='26' y='26' width='48' height='48' rx='8' transform='rotate(45 50 50)' fill='%23f5f1e6'/></svg>">
 </head>
 <body>
@@ -219,12 +226,25 @@
 
 <canvas id="fireworks" class="hidden"></canvas>
 
-<button type="button" id="btn-fullscreen" class="fs-btn hidden" aria-label="Enter full screen">⛶</button>
+<button type="button" id="btn-fullscreen" class="fs-btn hidden" aria-label="Full screen">⛶</button>
 
-<script src="js/engine.js?v=40"></script>
+<div id="fs-help" class="fs-help hidden" role="dialog" aria-label="How to play in full screen">
+  <div class="fs-help-card">
+    <h2>Full Screen on iPhone</h2>
+    <p>Safari can’t switch a web page to full screen directly — but Azul can run as a full-screen app:</p>
+    <ol>
+      <li>Tap the <strong>Share</strong> button in Safari.</li>
+      <li>Choose <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
+      <li>Open <strong>Azul</strong> from your home screen — it plays in full screen, with no browser bars.</li>
+    </ol>
+    <button type="button" id="btn-fs-help-close" class="btn primary">Got it</button>
+  </div>
+</div>
+
+<script src="js/engine.js?v=41"></script>
 <!-- js/config.js is an ES module; js/online.js imports it on demand. -->
-<script src="js/online.js?v=40"></script>
-<script src="js/voice.js?v=40"></script>
-<script src="js/app.js?v=40"></script>
+<script src="js/online.js?v=41"></script>
+<script src="js/voice.js?v=41"></script>
+<script src="js/app.js?v=41"></script>
 </body>
 </html>

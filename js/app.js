@@ -67,16 +67,33 @@
     b.setAttribute('aria-label', inFs ? 'Exit full screen' : 'Enter full screen');
   }
 
+  function isStandalone() {
+    return (window.navigator && window.navigator.standalone) ||
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  }
+
+  function onFsButton() {
+    if (fsSupported) { toggleFullscreen(); return; }
+    // No page fullscreen on this browser (iPhone Safari): show how to
+    // install Azul to the home screen, where it runs truly full screen.
+    $('#fs-help').classList.remove('hidden');
+  }
+
   function wireFullscreen() {
     var b = $('#btn-fullscreen');
     if (!b) return;
-    if (!fsSupported) {
-      b.classList.add('hidden'); // CSS only reveals it in-game; keep it off entirely
-      return;
-    }
+    if (isStandalone()) { b.classList.add('hidden'); return; } // already full screen
     b.classList.remove('hidden');
-    b.addEventListener('click', toggleFullscreen);
+    b.addEventListener('click', onFsButton);
     document.addEventListener('fullscreenchange', updateFsButton);
+    var close = $('#btn-fs-help-close');
+    if (close) close.addEventListener('click', function () {
+      $('#fs-help').classList.add('hidden');
+    });
+    var help = $('#fs-help');
+    if (help) help.addEventListener('click', function (e) {
+      if (e.target === help) help.classList.add('hidden');
+    });
     updateFsButton();
   }
 
