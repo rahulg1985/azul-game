@@ -233,8 +233,12 @@
       throw new Error(error || 'That move was rejected — the game may have moved on.');
     }
     var newState = result.snapshot.val();
-    if (newState && newState.phase === 'finished') {
-      await roomRef(code).update({ 'meta/status': 'finished' });
+    if (newState) {
+      // Repair RTDB-pruned arrays before the UI renders from this copy.
+      newState = window.AzulEngine.normalize(newState);
+      if (newState.phase === 'finished') {
+        await roomRef(code).update({ 'meta/status': 'finished' });
+      }
     }
     return newState;
   }

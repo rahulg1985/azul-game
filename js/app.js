@@ -173,6 +173,13 @@
       myName: myName,
       unwatch: null
     };
+    // Per-tab session restore: a reload of THIS tab rejoins the room.
+    // (sessionStorage is per-tab, so a friend opening the invite link in a
+    // new tab or on another device is never auto-seated as someone else.)
+    try {
+      window.sessionStorage.setItem('azul-session',
+        JSON.stringify({ code: code, name: myName }));
+    } catch (e) { /* ignore */ }
     selection = null;
     highlight = {};
     session.unwatch = window.AzulOnline.watchRoom(code, onRoomUpdate);
@@ -545,7 +552,7 @@
       .then(function (newState) {
         selection = null;
         if (newState) {
-          session.state = newState;
+          session.state = window.AzulEngine.normalize(newState);
           if (newState.phase === 'finished') {
             if (newState.lastResolve) setHighlightFromResolve(newState);
             renderGameOver();
@@ -638,6 +645,7 @@
   }
 
   function goHome() {
+    try { window.sessionStorage.removeItem('azul-session'); } catch (e) { /* ignore */ }
     show('screen-home');
   }
 
@@ -671,6 +679,29 @@
         if (!ready) $('#online-unavailable').classList.remove('hidden');
       });
     }
+
+    // Reload restore: if THIS tab was in a room, silently rejoin it (by
+    // name — works for the lobby and for a game already in progress).
+    try {
+      var saved = window.sessionStorage.getItem('azul-session');
+      if (saved) {
+        var savedSession = JSON.parse(saved);
+        if (savedSession && savedSession.code && savedSession.name &&
+            (!room || room === savedSession.code)) {
+          window.AzulOnline.init().then(function (ready) {
+            if (!ready || session) return;
+            window.AzulOnline.joinRoom(savedSession.code, savedSession.name)
+              .then(function (res) {
+                enterRoom(res.code, res.playerIdx, savedSession.name);
+                toast('Welcome back — rejoined room ' + res.code + '.');
+              })
+              .catch(function () {
+                try { window.sessionStorage.removeItem('azul-session'); } catch (e) { /* ignore */ }
+              });
+          });
+        }
+      }
+    } catch (e) { /* ignore */ }
   }
 
   document.addEventListener('DOMContentLoaded', init);
