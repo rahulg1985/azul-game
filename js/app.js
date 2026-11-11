@@ -94,6 +94,31 @@
   function playPutback() { if (ensureAudio()) ceramicClack(0, 700, 0.10); }
   function playPlace() { if (ensureAudio()) { ceramicClack(0, 620, 0.30); ceramicClack(0.09, 540, 0.22); } }
 
+  // Firecracker pop + crackle for the winner celebration.
+  function playPop() {
+    if (!ensureAudio()) return;
+    var ctx = audioCtx;
+    var t = ctx.currentTime;
+    var len = Math.max(1, Math.floor(ctx.sampleRate * 0.18));
+    var buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+    var src = ctx.createBufferSource(); src.buffer = buf;
+    var lp = ctx.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(3200, t);
+    lp.frequency.exponentialRampToValueAtTime(300, t + 0.16);
+    var g = ctx.createGain(); g.gain.value = 0.22;
+    src.connect(lp); lp.connect(g); g.connect(ctx.destination);
+    src.start(t);
+    [0.05, 0.11].forEach(function (dl) {
+      var s2 = ctx.createBufferSource(); s2.buffer = buf;
+      var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2400;
+      var g2 = ctx.createGain(); g2.gain.value = 0.07;
+      s2.connect(bp); bp.connect(g2); g2.connect(ctx.destination);
+      s2.start(t + dl); s2.stop(t + dl + 0.05);
+    });
+  }
+
   // After the boards finish shuffling (~1s), announce whose turn it is.
   function speakTurn(name) {
     if (!soundOn || !('speechSynthesis' in window)) return;
@@ -265,6 +290,7 @@
   function leaveRoomWatch() {
     if (window.AzulVoice) window.AzulVoice.leave();
     dismissRoundOverlay();
+    stopCelebration();
     if (session && session.unwatch) {
       session.unwatch();
       session.unwatch = null;
@@ -426,6 +452,7 @@
   function renderGame() {
     var s = session.state;
     if (!s) return;
+    stopCelebration();
     var cur = s.players[s.currentPlayer];
 
     // --- banner ---
@@ -898,6 +925,96 @@
     speakAloud(text, null);
   }
 
+  // ------------------------------------------------------------ fireworks --
+  var fw = { raf: 0, running: false, parts: [], rockets: [], lastLaunch: 0, endAt: 0 };
+  var FW_COLORS = ['#f4b400', '#4fb3c4', '#f2604f', '#63a4ec', '#f5f1e6'];
+
+  function fwExplode(x, y, color) {
+    for (var i = 0; i < 70; i++) {
+      var a = Math.random() * Math.PI * 2;
+      var sp = 1 + Math.random() * 4.6;
+      fw.parts.push({
+        x: x, y: y,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        life: 0.75 + Math.random() * 0.45,
+        color: Math.random() < 0.22 ? '#f5f1e6' : color
+      });
+    }
+  }
+
+  function startCelebration() {
+    var cv = $('#fireworks');
+    if (!cv || fw.running) return;
+    var ctx = cv.getContext('2d');
+    if (!ctx) return;
+    fw.running = true;
+    cv.classList.remove('hidden');
+    cv.width = window.innerWidth;
+    cv.height = window.innerHeight;
+    fw.parts = [];
+    fw.rockets = [];
+    fw.lastLaunch = 0;
+    fw.endAt = Date.now() + 7000;
+    var loop = function (ts) {
+      if (!fw.running) return;
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      if (Date.now() < fw.endAt && ts - fw.lastLaunch > 420) {
+        fw.lastLaunch = ts;
+        fw.rockets.push({
+          x: cv.width * (0.15 + Math.random() * 0.7),
+          y: cv.height + 6,
+          vy: -(cv.height * 0.011 + Math.random() * 3),
+          target: cv.height * (0.16 + Math.random() * 0.3),
+          color: FW_COLORS[Math.floor(Math.random() * FW_COLORS.length)]
+        });
+      }
+      fw.rockets = fw.rockets.filter(function (r) {
+        r.y += r.vy;
+        r.vy += 0.05;
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#ffe9a8';
+        ctx.fillRect(r.x - 1.5, r.y - 1.5, 3, 3);
+        if (r.y <= r.target || r.vy >= -1) {
+          fwExplode(r.x, r.y, r.color);
+          if (soundOn) playPop();
+          return false;
+        }
+        return true;
+      });
+      fw.parts = fw.parts.filter(function (p) {
+        p.x += p.vx; p.y += p.vy;
+        p.vy += 0.045; p.vx *= 0.985; p.vy *= 0.99;
+        p.life -= 0.011;
+        if (p.life <= 0) return false;
+        ctx.globalAlpha = Math.max(0, p.life);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+        return true;
+      });
+      ctx.globalAlpha = 1;
+      if (Date.now() < fw.endAt || fw.parts.length || fw.rockets.length) {
+        fw.raf = requestAnimationFrame(loop);
+      } else {
+        stopCelebration();
+      }
+    };
+    fw.raf = requestAnimationFrame(loop);
+  }
+
+  function stopCelebration() {
+    if (fw.raf) cancelAnimationFrame(fw.raf);
+    fw.raf = 0;
+    fw.running = false;
+    fw.parts = [];
+    fw.rockets = [];
+    var cv = $('#fireworks');
+    if (cv) {
+      var ctx = cv.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, cv.width, cv.height);
+      cv.classList.add('hidden');
+    }
+  }
+
   // ------------------------------------------------------------ game over --
   function renderGameOver() {
     var s = session.state;
@@ -906,6 +1023,7 @@
     if (finalAnnouncedKey !== finalKey) {
       finalAnnouncedKey = finalKey;
       announceFinalScores(s);
+      startCelebration();
     }
     var winnerNames = s.winners.map(function (i) { return s.players[i].name; });
     $('#gameover-title').textContent = s.winners.length === 1
@@ -965,6 +1083,7 @@
   function goHome() {
     if (window.AzulVoice) window.AzulVoice.leave();
     dismissRoundOverlay();
+    stopCelebration();
     try { window.sessionStorage.removeItem('azul-session'); } catch (e) { /* ignore */ }
     show('screen-home');
   }
