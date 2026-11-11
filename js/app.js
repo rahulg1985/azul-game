@@ -231,7 +231,7 @@
           } catch (e) { /* ignore */ }
         }, 60);
       } catch (e) { /* ignore */ }
-    }, 1100);
+    }, 1200);
   }
 
   function setSound(on) {
@@ -753,36 +753,55 @@
       return boardHtml(s, pi);
     }).join('');
 
-    // Turn changed? FLIP-animate every board from its old spot to its new
-    // one: the old board glides down, the next player's board glides up
-    // into place — like the boards are being shuffled by hand (~1s).
+    // Turn changed? Circle-switch the boards over ~1s: the outgoing
+    // board arcs slowly DOWN into its new slot while the next player's
+    // board arcs slowly UP into the top slot, passing each other like a
+    // revolving switch (with a whoosh); the announcement comes after.
     var turnKey = s.round + ':' + s.currentPlayer + ':' + s.phase;
     var turnChanged = lastTurnKey !== null && turnKey !== lastTurnKey && s.phase === 'draft';
+    var prevPlayer = null;
+    if (lastTurnKey) {
+      var keyParts = lastTurnKey.split(':');
+      if (keyParts.length === 3) prevPlayer = parseInt(keyParts[1], 10);
+    }
     lastTurnKey = turnKey;
     if (turnChanged) {
       var bannerEl = $('#turn-banner');
       bannerEl.classList.add('pulse');
       bannerEl.scrollIntoView({ block: 'start' });
-      if (!REDUCED_MOTION) {
-        boardsEl.querySelectorAll('.board').forEach(function (b) {
-          var old = prevRects[b.dataset.player];
-          if (!old || !b.animate) return;
-          var nr = b.getBoundingClientRect();
-          var dx = old.left - (nr.left + window.scrollX);
-          var dy = old.top - (nr.top + window.scrollY);
-          var sx = old.width / nr.width;
-          var sy = old.height / nr.height;
-          if (!dx && !dy && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) return;
-          b.style.zIndex = b.classList.contains('turn') ? 3 : 2;
-          var anim = b.animate([
-            { transform: 'translate(' + dx + 'px, ' + dy + 'px) scale(' + sx + ', ' + sy + ')' },
-            { transform: 'translate(0px, 0px) scale(1, 1)' }
-          ], { duration: 1000, easing: 'cubic-bezier(.3, .7, .3, 1)' });
-          anim.onfinish = function () { b.style.zIndex = ''; };
-        });
-        var topBoard = $('#boards .board.turn');
-        if (topBoard) topBoard.classList.add('turn-enter');
-      }
+      playWhoosh();
+      boardsEl.querySelectorAll('.board').forEach(function (b) {
+        var old = prevRects[b.dataset.player];
+        if (!old || !b.animate) return;
+        var nr = b.getBoundingClientRect();
+        var dx = old.left - (nr.left + window.scrollX);
+        var dy = old.top - (nr.top + window.scrollY);
+        if (!dx && !dy) return;
+        var isIn = b.classList.contains('turn');
+        var isOut = prevPlayer !== null && parseInt(b.dataset.player, 10) === prevPlayer;
+        b.style.zIndex = isIn ? 3 : 2;
+        var keyframes;
+        if (isIn || isOut) {
+          // Swing out in opposite arcs with a slight tilt, like the two
+          // boards are mounted on a revolving wheel passing each other.
+          var arc = isIn ? -26 : 26;
+          var tilt = isIn ? -1.4 : 1.4;
+          keyframes = [
+            { transform: 'translate(' + dx + 'px, ' + dy + 'px) rotate(0deg)' },
+            { transform: 'translate(' + (dx * 0.5 + arc) + 'px, ' + (dy * 0.5) + 'px) rotate(' + tilt + 'deg) scale(.985)', offset: 0.5 },
+            { transform: 'translate(0px, 0px) rotate(0deg) scale(1)' }
+          ];
+        } else {
+          keyframes = [
+            { transform: 'translate(' + dx + 'px, ' + dy + 'px)' },
+            { transform: 'translate(0px, 0px)' }
+          ];
+        }
+        var anim = b.animate(keyframes, { duration: 1000, easing: 'cubic-bezier(.4, .05, .3, 1)' });
+        anim.onfinish = function () { b.style.zIndex = ''; };
+      });
+      var topBoard = $('#boards .board.turn');
+      if (topBoard) topBoard.classList.add('turn-enter');
       playPlace();
       if (!justEndedRound) speakTurn(cur.name); // round-end dictation takes over
     }
