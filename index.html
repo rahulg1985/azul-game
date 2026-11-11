@@ -18,25 +18,54 @@
 <main>
   <!-- ============================ HOME ============================ -->
   <section id="screen-home" class="screen">
-    <div class="card">
+    <div id="home-chooser" class="card">
+      <h2>How would you like to play?</h2>
+      <button id="btn-mode-local" class="btn primary big mode-btn">🏠 Play locally<span class="mode-sub">2–4 players · Pass &amp; play</span></button>
+      <button id="btn-mode-online" class="btn primary big mode-btn">🌐 Play online<span class="mode-sub">Create a room and invite friends</span></button>
+      <button id="btn-how" class="btn subtle">How to play</button>
+      <div id="how-panel" class="how-panel hidden">
+        <p><strong>Goal:</strong> score the most points by tiling your wall.</p>
+        <p><strong>Each turn:</strong> take all tiles of one color from a factory or the center (leftovers in a factory move to the center; the first player to take from the center also gets the 1st-player marker and a −1 penalty), then place them on one pattern line — or drop them on your floor line if they don’t fit.</p>
+        <p><strong>End of round:</strong> each completed pattern line moves one tile onto your wall, scoring 1 point plus 1 for each tile it touches horizontally and vertically. Floor tiles cost penalties (−1, −1, −2, −2, −2, −3, −3).</p>
+        <p><strong>Game end:</strong> the game finishes after a round in which someone completes a horizontal wall row. Bonuses: +2 per full row, +7 per full column, +10 per color with all 5 placed.</p>
+      </div>
+    </div>
+
+    <div id="setup-local" class="card hidden">
+      <button type="button" class="btn subtle btn-back">← Back</button>
       <h2>🏠 Local game</h2>
-      <p class="card-sub">Pass-and-play on this device — 2 to 4 players, full Azul rules.</p>
-      <label class="field-label" for="local-count">Number of players</label>
-      <div class="count-picker" id="local-count" role="radiogroup" aria-label="Number of players">
+      <p class="card-sub">Pass-and-play on this device — 2 to 4 players, full Azul rules. Who’s playing?</p>
+      <div class="count-picker hidden" id="local-count" role="radiogroup" aria-label="Number of players">
         <button type="button" data-count="2" class="active">2</button>
         <button type="button" data-count="3">3</button>
         <button type="button" data-count="4">4</button>
       </div>
       <div id="local-names">
-        <input type="text" class="local-name" maxlength="16" placeholder="Player 1 name" autocomplete="off">
-        <input type="text" class="local-name" maxlength="16" placeholder="Player 2 name" autocomplete="off">
-        <input type="text" class="local-name hidden" maxlength="16" placeholder="Player 3 name" autocomplete="off">
-        <input type="text" class="local-name hidden" maxlength="16" placeholder="Player 4 name" autocomplete="off">
+        <div class="local-row">
+          <span class="pdot p0" aria-hidden="true"></span>
+          <input type="text" class="local-name" maxlength="16" placeholder="Player 1 name" autocomplete="off">
+        </div>
+        <div class="local-row">
+          <span class="pdot p1" aria-hidden="true"></span>
+          <input type="text" class="local-name" maxlength="16" placeholder="Player 2 name" autocomplete="off">
+        </div>
+        <div class="local-row hidden">
+          <span class="pdot p2" aria-hidden="true"></span>
+          <input type="text" class="local-name" maxlength="16" placeholder="Player 3 name" autocomplete="off">
+          <button type="button" class="btn-remove-player" data-index="2" aria-label="Remove player 3">✕</button>
+        </div>
+        <div class="local-row hidden">
+          <span class="pdot p3" aria-hidden="true"></span>
+          <input type="text" class="local-name" maxlength="16" placeholder="Player 4 name" autocomplete="off">
+          <button type="button" class="btn-remove-player" data-index="3" aria-label="Remove player 4">✕</button>
+        </div>
       </div>
+      <button type="button" id="btn-add-player" class="btn subtle">＋ Add player</button>
       <button id="btn-local-start" class="btn primary big">Start local game</button>
     </div>
 
-    <div class="card" id="online-card">
+    <div class="card hidden" id="setup-online">
+      <button type="button" class="btn subtle btn-back">← Back</button>
       <h2>🌐 Online game</h2>
       <p class="card-sub">Play with friends anywhere. Create a room, share the invite link, and they join right from their browser — no account needed.</p>
       <div id="online-unavailable" class="notice hidden">
@@ -138,6 +167,8 @@
 </div>
 
 <canvas id="fireworks" class="hidden"></canvas>
+
+<button type="button" id="btn-fullscreen" class="fs-btn hidden" aria-label="Enter full screen">⛶</button>
 
 <script src="js/engine.js?v=15"></script>
 <!-- js/config.js is an ES module; js/online.js imports it on demand. -->

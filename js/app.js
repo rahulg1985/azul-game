@@ -9,6 +9,9 @@
   var E = window.AzulEngine;
   var $ = function (sel) { return document.querySelector(sel); };
 
+  var REDUCED_MOTION = !!(window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
   // ------------------------------------------------------------ utilities --
   function esc(str) {
     return String(str).replace(/[&<>"']/g, function (ch) {
@@ -28,7 +31,53 @@
   function show(screenId) {
     document.querySelectorAll('.screen').forEach(function (s) { s.classList.add('hidden'); });
     $('#' + screenId).classList.remove('hidden');
+    document.body.classList.toggle('in-game',
+      screenId === 'screen-game' || screenId === 'screen-gameover');
     window.scrollTo({ top: 0 });
+  }
+
+  // ------------------------------------------------------------ fullscreen --
+  // Fullscreen is entered from start/join click handlers (it must stay in
+  // the user-gesture call stack). Failures are expected — iPhone Safari has
+  // no element fullscreen, and online guests have no gesture when the host
+  // starts — so rejections are swallowed quietly, never toasted.
+  var fsSupported = !!(document.documentElement && document.documentElement.requestFullscreen);
+
+  function enterFullscreen() {
+    if (!fsSupported || document.fullscreenElement) return;
+    try {
+      var p = document.documentElement.requestFullscreen();
+      if (p && p.catch) p.catch(function () { /* not allowed here — ignore */ });
+    } catch (e) { /* ignore */ }
+  }
+
+  function toggleFullscreen() {
+    if (document.fullscreenElement) {
+      if (document.exitFullscreen) document.exitFullscreen();
+    } else {
+      enterFullscreen();
+    }
+  }
+
+  function updateFsButton() {
+    var b = $('#btn-fullscreen');
+    if (!b) return;
+    var inFs = !!document.fullscreenElement;
+    b.textContent = inFs ? '🗗' : '⛶';
+    b.setAttribute('aria-label', inFs ? 'Exit full screen' : 'Enter full screen');
+  }
+
+  function wireFullscreen() {
+    var b = $('#btn-fullscreen');
+    if (!b) return;
+    if (!fsSupported) {
+      b.classList.add('hidden'); // CSS only reveals it in-game; keep it off entirely
+      return;
+    }
+    b.classList.remove('hidden');
+    b.addEventListener('click', toggleFullscreen);
+    document.addEventListener('fullscreenchange', updateFsButton);
+    updateFsButton();
   }
 
   // -------------------------------------------------------------- session --
@@ -46,6 +95,7 @@
   var lastAnnouncedRound = null; // round-end pause/dictation handled up to this round
   var finalAnnouncedKey = null;  // score signature of the last announced game-over
   var roundOverlayTimer = null;
+  var peekBoards = {}; // playerIdx -> true: collapsed opponent board expanded (mobile)
 
   // ---------------------------------------------------------- sound & voice --
   var soundOn = true;
@@ -153,20 +203,68 @@
   // ------------------------------------------------------------ home screen --
   var localCount = 2;
 
+  // Single source of truth for how many local players are in the setup:
+  // shows/hides that many name rows, syncs the (now hidden) legacy count
+  // picker's active state, and shows "Add player" only below the max.
+  function setLocalCount(n) {
+    localCount = Math.max(2, Math.min(4, n));
+    document.querySelectorAll('.local-row').forEach(function (row, i) {
+      row.classList.toggle('hidden', i >= localCount);
+    });
+    document.querySelectorAll('.local-name').forEach(function (input, i) {
+      input.classList.toggle('hidden', i >= localCount);
+    });
+    var picker = $('#local-count');
+    if (picker) {
+      picker.querySelectorAll('button').forEach(function (b) {
+        b.classList.toggle('active', parseInt(b.dataset.count, 10) === localCount);
+      });
+    }
+    var addBtn = $('#btn-add-player');
+    if (addBtn) addBtn.classList.toggle('hidden', localCount >= 4);
+  }
+
+  // Home starts as a mode chooser; picking a mode swaps in its setup card.
+  function showHomeSetup(which) {
+    var chooser = $('#home-chooser');
+    var local = $('#setup-local');
+    var online = $('#setup-online');
+    if (chooser) chooser.classList.toggle('hidden', !!which);
+    if (local) local.classList.toggle('hidden', which !== 'local');
+    if (online) online.classList.toggle('hidden', which !== 'online');
+  }
+
   function wireHome() {
+    $('#btn-mode-local').addEventListener('click', function () { showHomeSetup('local'); });
+    $('#btn-mode-online').addEventListener('click', function () { showHomeSetup('online'); });
+    document.querySelectorAll('.btn-back').forEach(function (b) {
+      b.addEventListener('click', function () { showHomeSetup(null); });
+    });
+    $('#btn-how').addEventListener('click', function () {
+      $('#how-panel').classList.toggle('hidden');
+    });
+
+    // Legacy segmented picker is hidden in the UI now, but keep it wired
+    // through the same setLocalCount so the state can never diverge.
     $('#local-count').addEventListener('click', function (ev) {
       var btn = ev.target.closest('button[data-count]');
       if (!btn) return;
-      localCount = parseInt(btn.dataset.count, 10);
-      this.querySelectorAll('button').forEach(function (b) {
-        b.classList.toggle('active', b === btn);
-      });
-      document.querySelectorAll('.local-name').forEach(function (input, i) {
-        input.classList.toggle('hidden', i >= localCount);
-      });
+      setLocalCount(parseInt(btn.dataset.count, 10));
     });
 
+    $('#btn-add-player').addEventListener('click', function () {
+      setLocalCount(localCount + 1);
+    });
+    document.querySelectorAll('.btn-remove-player').forEach(function (b) {
+      b.addEventListener('click', function () {
+        // Removing the player on row i leaves players 0..i-1 in the game.
+        setLocalCount(parseInt(b.dataset.index, 10));
+      });
+    });
+    setLocalCount(localCount);
+
     $('#btn-local-start').addEventListener('click', function () {
+      enterFullscreen();
       var names = [];
       document.querySelectorAll('.local-name').forEach(function (input, i) {
         if (i < localCount) names.push(input.value.trim() || ('Player ' + (i + 1)));
@@ -174,8 +272,8 @@
       startLocalGame(names);
     });
 
-    $('#btn-create-room').addEventListener('click', function () { createRoomFlow(this); });
-    $('#btn-join-room').addEventListener('click', function () { joinRoomFlow(this); });
+    $('#btn-create-room').addEventListener('click', function () { enterFullscreen(); createRoomFlow(this); });
+    $('#btn-join-room').addEventListener('click', function () { enterFullscreen(); joinRoomFlow(this); });
     $('#join-code').addEventListener('keydown', function (ev) {
       if (ev.key === 'Enter') joinRoomFlow($('#btn-join-room'));
     });
@@ -393,6 +491,7 @@
     });
 
     $('#btn-start-online').addEventListener('click', function () {
+      enterFullscreen();
       var btn = this;
       busy(btn, function () {
         return window.AzulOnline.startGame(session.code)
@@ -555,24 +654,26 @@
       var bannerEl = $('#turn-banner');
       bannerEl.classList.add('pulse');
       bannerEl.scrollIntoView({ block: 'start' });
-      boardsEl.querySelectorAll('.board').forEach(function (b) {
-        var old = prevRects[b.dataset.player];
-        if (!old || !b.animate) return;
-        var nr = b.getBoundingClientRect();
-        var dx = old.left - (nr.left + window.scrollX);
-        var dy = old.top - (nr.top + window.scrollY);
-        var sx = old.width / nr.width;
-        var sy = old.height / nr.height;
-        if (!dx && !dy && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) return;
-        b.style.zIndex = b.classList.contains('turn') ? 3 : 2;
-        var anim = b.animate([
-          { transform: 'translate(' + dx + 'px, ' + dy + 'px) scale(' + sx + ', ' + sy + ')' },
-          { transform: 'translate(0px, 0px) scale(1, 1)' }
-        ], { duration: 1000, easing: 'cubic-bezier(.3, .7, .3, 1)' });
-        anim.onfinish = function () { b.style.zIndex = ''; };
-      });
-      var topBoard = $('#boards .board.turn');
-      if (topBoard) topBoard.classList.add('turn-enter');
+      if (!REDUCED_MOTION) {
+        boardsEl.querySelectorAll('.board').forEach(function (b) {
+          var old = prevRects[b.dataset.player];
+          if (!old || !b.animate) return;
+          var nr = b.getBoundingClientRect();
+          var dx = old.left - (nr.left + window.scrollX);
+          var dy = old.top - (nr.top + window.scrollY);
+          var sx = old.width / nr.width;
+          var sy = old.height / nr.height;
+          if (!dx && !dy && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) return;
+          b.style.zIndex = b.classList.contains('turn') ? 3 : 2;
+          var anim = b.animate([
+            { transform: 'translate(' + dx + 'px, ' + dy + 'px) scale(' + sx + ', ' + sy + ')' },
+            { transform: 'translate(0px, 0px) scale(1, 1)' }
+          ], { duration: 1000, easing: 'cubic-bezier(.3, .7, .3, 1)' });
+          anim.onfinish = function () { b.style.zIndex = ''; };
+        });
+        var topBoard = $('#boards .board.turn');
+        if (topBoard) topBoard.classList.add('turn-enter');
+      }
       playPlace();
       if (!justEndedRound) speakTurn(cur.name); // round-end dictation takes over
     }
@@ -636,7 +737,8 @@
         '">' + (net >= 0 ? '+' : '') + net + ' last round</span>';
     }
 
-    return '<div class="board' + (isTurnBoard ? ' turn' : ' compact') + '" data-player="' + pi + '">' +
+    return '<div class="board' + (isTurnBoard ? ' turn' : ' compact') +
+      (!isTurnBoard && peekBoards[pi] ? ' peek-open' : '') + '" data-player="' + pi + '">' +
       '<div class="board-head"><span class="board-name">' + esc(p.name) + youTag + '</span>' +
       '<span class="board-right">' + roundChip +
       '<span class="board-score">★ ' + p.score + '</span></span></div>' +
@@ -650,6 +752,18 @@
 
   function wireGame() {
     $('#round-overlay').addEventListener('click', dismissRoundOverlay);
+
+    // Mobile: collapsed opponent boards expand/collapse when their head is
+    // tapped. State lives in peekBoards so it survives re-renders.
+    $('#boards').addEventListener('click', function (ev) {
+      var head = ev.target.closest('.board-head');
+      if (!head) return;
+      var board = head.closest('.board');
+      if (!board || board.classList.contains('turn')) return;
+      var pi = board.dataset.player;
+      peekBoards[pi] = !peekBoards[pi];
+      board.classList.toggle('peek-open', !!peekBoards[pi]);
+    });
 
     $('#screen-game').addEventListener('click', function (ev) {
       if (!session || !session.state) return;
@@ -943,6 +1057,7 @@
   }
 
   function startCelebration() {
+    if (REDUCED_MOTION) return;
     var cv = $('#fireworks');
     if (!cv || fw.running) return;
     var ctx = cv.getContext('2d');
@@ -1060,6 +1175,7 @@
 
   function wireGameOver() {
     $('#btn-play-again').addEventListener('click', function () {
+      enterFullscreen();
       if (!session) return;
       if (session.mode === 'local') {
         var names = session.state.players.map(function (p) { return p.name; });
@@ -1095,6 +1211,7 @@
     wireGame();
     wireGameOver();
     wireVoice();
+    wireFullscreen();
 
     // First tap anywhere also unlocks remote voice audio (autoplay rules).
     document.addEventListener('pointerdown', function () {
@@ -1112,6 +1229,7 @@
     var room = (params.get('room') || '').toUpperCase();
     if (/^[A-Z0-9]{6}$/.test(room)) {
       $('#join-code').value = room;
+      showHomeSetup('online'); // jump straight to the join setup
       var note = $('#invite-note');
       note.textContent = '🎉 You’ve been invited to room ' + room +
         ' — enter your name and tap “Join game”.';
