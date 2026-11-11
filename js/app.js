@@ -264,7 +264,7 @@
           try {
             window.speechSynthesis.resume();
             var u = new SpeechSynthesisUtterance(name + '’s turn now');
-            u.rate = 1.02;
+            tuneUtterance(u);
             window.speechSynthesis.speak(u);
           } catch (e) { /* ignore */ }
         }, 60);
@@ -1294,6 +1294,33 @@
   // ------------------------------------------------------ round-end pause --
   // Speak text aloud (respecting the sound toggle); onEnd fires when the
   // speech finishes, or after a fallback delay when speech is off/absent.
+  // Announcement voice: prefer an Indian English voice — Veena on Apple
+  // devices, Heera on Windows. A web page can only use the voices the
+  // device itself provides, so pick the best available and cache it
+  // (the list loads asynchronously, hence the voiceschanged hook).
+  var annVoice = null;
+  function refreshAnnVoice() {
+    try {
+      var vs = window.speechSynthesis.getVoices() || [];
+      var pick =
+        vs.filter(function (v) { return /^en[-_]IN/i.test(v.lang); })[0] ||
+        vs.filter(function (v) { return /veena|heera|india/i.test(v.name); })[0] ||
+        vs.filter(function (v) { return /^en[-_]GB/i.test(v.lang) && /sonia|serena|kate/i.test(v.name); })[0] ||
+        vs.filter(function (v) { return /^en[-_]GB/i.test(v.lang); })[0];
+      if (pick) annVoice = pick;
+    } catch (e) { /* voices unavailable */ }
+  }
+  if ('speechSynthesis' in window) {
+    refreshAnnVoice();
+    window.speechSynthesis.onvoiceschanged = refreshAnnVoice;
+  }
+  function tuneUtterance(u) {
+    if (annVoice) { u.voice = annVoice; u.lang = annVoice.lang; }
+    else u.lang = 'en-IN';
+    u.rate = 0.97;  // a touch slower reads more natural on short phrases
+    u.pitch = 1.05;
+  }
+
   function speakAloud(text, onEnd) {
     var done = false;
     var finish = function () {
@@ -1309,7 +1336,7 @@
       if (speakTimer) { clearTimeout(speakTimer); speakTimer = null; }
       window.speechSynthesis.cancel();
       var u = new SpeechSynthesisUtterance(text);
-      u.rate = 1.02;
+      tuneUtterance(u);
       u.onend = finish;
       u.onerror = finish;
       // Same iOS cancel-then-speak race as speakTurn: wait a beat first.
