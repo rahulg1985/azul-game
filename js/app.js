@@ -43,6 +43,9 @@
   var highlight = {};   // "playerIdx:row:col" -> true for just-tiled cells
   var lastTurnKey = null; // "round:currentPlayer" — drives the turn-change animation
   var voiceOptOut = false; // user tapped "Leave voice" in this room session
+  var lastAnnouncedRound = null; // round-end pause/dictation handled up to this round
+  var finalAnnouncedKey = null;  // score signature of the last announced game-over
+  var roundOverlayTimer = null;
 
   // ---------------------------------------------------------- sound & voice --
   var soundOn = true;
@@ -261,6 +264,7 @@
 
   function leaveRoomWatch() {
     if (window.AzulVoice) window.AzulVoice.leave();
+    dismissRoundOverlay();
     if (session && session.unwatch) {
       session.unwatch();
       session.unwatch = null;
@@ -483,6 +487,16 @@
     }
     $('#selection-hint').textContent = hint;
 
+    // --- round end? pause and dictate the scores before play resumes ---
+    var justEndedRound = false;
+    if (lastAnnouncedRound === null || s.round < lastAnnouncedRound) {
+      lastAnnouncedRound = s.round; // baseline: fresh game, play-again or reload
+    } else if (s.round > lastAnnouncedRound && s.lastResolve && s.phase === 'draft') {
+      lastAnnouncedRound = s.round;
+      justEndedRound = true;
+      roundEndPause(s);
+    }
+
     // --- boards: turn player first (full size), then the rest ---
     var boardsEl = $('#boards');
     var prevRects = {};
@@ -533,7 +547,7 @@
       var topBoard = $('#boards .board.turn');
       if (topBoard) topBoard.classList.add('turn-enter');
       playPlace();
-      speakTurn(cur.name);
+      if (!justEndedRound) speakTurn(cur.name); // round-end dictation takes over
     }
     renderVoice();
   }
@@ -608,6 +622,8 @@
   }
 
   function wireGame() {
+    $('#round-overlay').addEventListener('click', dismissRoundOverlay);
+
     $('#screen-game').addEventListener('click', function (ev) {
       if (!session || !session.state) return;
 
@@ -806,9 +822,91 @@
     });
   }
 
+  // ------------------------------------------------------ round-end pause --
+  // Speak text aloud (respecting the sound toggle); onEnd fires when the
+  // speech finishes, or after a fallback delay when speech is off/absent.
+  function speakAloud(text, onEnd) {
+    var done = false;
+    var finish = function () {
+      if (done) return;
+      done = true;
+      if (onEnd) onEnd();
+    };
+    if (!soundOn || !('speechSynthesis' in window)) {
+      if (onEnd) setTimeout(finish, 3400);
+      return;
+    }
+    try {
+      if (speakTimer) { clearTimeout(speakTimer); speakTimer = null; }
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.rate = 1.02;
+      u.onend = finish;
+      u.onerror = finish;
+      window.speechSynthesis.speak(u);
+      setTimeout(finish, 12000); // fallback if onend never fires
+    } catch (e) {
+      if (onEnd) setTimeout(finish, 3400);
+    }
+  }
+
+  function armRoundOverlay(ms) {
+    if (roundOverlayTimer) clearTimeout(roundOverlayTimer);
+    roundOverlayTimer = setTimeout(dismissRoundOverlay, ms);
+  }
+
+  function dismissRoundOverlay() {
+    if (roundOverlayTimer) { clearTimeout(roundOverlayTimer); roundOverlayTimer = null; }
+    var ov = $('#round-overlay');
+    if (ov) ov.classList.add('hidden');
+    if ('speechSynthesis' in window) {
+      try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ }
+    }
+  }
+
+  // Pause at the end of a round: show every player's round gains and
+  // total, dictate the totals, and announce the next round.
+  function roundEndPause(s) {
+    var ended = s.round - 1;
+    $('#round-title').textContent = 'Round ' + ended + ' complete';
+    $('#round-scores').innerHTML = s.players.map(function (p, i) {
+      var r = (s.lastResolve && s.lastResolve[i]) || { gained: 0, penalty: 0 };
+      var net = r.gained + r.penalty;
+      return '<div class="round-row"><span class="round-name">' + esc(p.name) + '</span>' +
+        '<span class="round-detail">+' + r.gained + ' wall' +
+        (r.penalty ? ' · ' + r.penalty + ' floor' : '') + '</span>' +
+        '<span class="round-net">' + (net >= 0 ? '+' : '') + net + '</span>' +
+        '<span class="round-total">★ ' + p.score + '</span></div>';
+    }).join('');
+    $('#round-next').textContent = 'Round ' + s.round + ' starting now…';
+    $('#round-overlay').classList.remove('hidden');
+    var text = 'Round ' + ended + ' over. ' + s.players.map(function (p) {
+      return p.name + ': ' + p.score + ' points';
+    }).join('. ') + '. Round ' + s.round + ' starting now.';
+    armRoundOverlay(12000);
+    speakAloud(text, function () { armRoundOverlay(700); });
+  }
+
+  function announceFinalScores(s) {
+    var text = 'Game over. Final scores: ' + s.players.map(function (p) {
+      return p.name + ': ' + p.score + ' points';
+    }).join('. ') + '. ' + (s.winners.length === 1
+      ? s.players[s.winners[0]].name + ' wins!'
+      : 'It is a tie between ' + s.winners.map(function (i) {
+          return s.players[i].name;
+        }).join(' and ') + '!');
+    speakAloud(text, null);
+  }
+
   // ------------------------------------------------------------ game over --
   function renderGameOver() {
     var s = session.state;
+    var finalKey = s.players.map(function (p) { return p.score; }).join(',') +
+      '|' + s.winners.join(',');
+    if (finalAnnouncedKey !== finalKey) {
+      finalAnnouncedKey = finalKey;
+      announceFinalScores(s);
+    }
     var winnerNames = s.winners.map(function (i) { return s.players[i].name; });
     $('#gameover-title').textContent = s.winners.length === 1
       ? '🏆 ' + winnerNames[0] + ' wins!'
@@ -866,6 +964,7 @@
 
   function goHome() {
     if (window.AzulVoice) window.AzulVoice.leave();
+    dismissRoundOverlay();
     try { window.sessionStorage.removeItem('azul-session'); } catch (e) { /* ignore */ }
     show('screen-home');
   }
