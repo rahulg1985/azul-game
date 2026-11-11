@@ -853,3 +853,13 @@ body.in-game .fs-btn.hidden { display: none; /* JS hides it when unsupported */ 
   opacity: .65;
   margin-top: 12px;
 }
+
+/* --------------------------------------------------------- home logo --- */
+.home-logo {
+  display: block;
+  margin: 4px auto 2px;
+  width: min(290px, 76vw);
+  height: auto;
+  border-radius: 14px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, .5);
+}
