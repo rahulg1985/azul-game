@@ -672,6 +672,7 @@
     if (!s) return;
     stopCelebration();
     var prevBannerHTML = $('#turn-banner').innerHTML;
+    var prevHint = $('#selection-hint').textContent;
     var cur = s.players[s.currentPlayer];
 
     // --- banner ---
@@ -847,6 +848,9 @@
         var holdSeq = ++switchHoldSeq;
         var heldBannerHTML = bannerEl.innerHTML;
         bannerEl.innerHTML = prevBannerHTML;
+        var hintEl = $('#selection-hint');
+        var heldHint = hintEl.textContent;
+        hintEl.textContent = prevHint;
         switchBoards.forEach(function (it) {
           it.b.style.transform = 'translate(' + it.dx + 'px, ' + it.dy + 'px)';
           it.b.style.zIndex = it.isIn ? 3 : 2;
@@ -855,6 +859,7 @@
           flying = false;
           if (holdSeq !== switchHoldSeq) return;
           bannerEl.innerHTML = heldBannerHTML;
+          hintEl.textContent = heldHint;
           switchBoards.forEach(function (it) { it.b.style.transform = ''; });
           startSwitch();
           speakTurn(cur.name);
