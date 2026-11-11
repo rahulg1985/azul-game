@@ -582,26 +582,14 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 /* Sticky bottom action bar — rides above the phone's safe area and never
    covers the boards (sticky, so it takes its own space in the flow). */
 .game-actions {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 30;
   display: flex;
   justify-content: center;
   gap: 8px;
-  padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+  margin-top: 12px;
+  padding: 10px 4px calc(10px + env(safe-area-inset-bottom));
   background: rgba(7, 13, 24, .97);
-  border-top: 1px solid rgba(255, 255, 255, .14);
-  box-shadow: 0 -6px 18px rgba(0, 0, 0, .35);
-}
-/* Clearance so the fixed action bar never covers the last board: the
-   game screen can always scroll its full content above the bar. */
-#screen-game {
-  padding-bottom: calc(150px + env(safe-area-inset-bottom));
-}
-#screen-game #boards {
-  margin-bottom: 24px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 12px;
 }
 #screen-game { padding-bottom: 6px; }
 
@@ -742,7 +730,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
   display: none; /* revealed only during gameplay (body.in-game) */
   position: fixed;
   right: calc(10px + env(safe-area-inset-right));
-  bottom: calc(92px + env(safe-area-inset-bottom));
+  bottom: calc(10px + env(safe-area-inset-bottom));
   z-index: 40;
   width: 44px; height: 44px;
   border-radius: 50%;
@@ -768,7 +756,8 @@ body.in-game .fs-btn.hidden { display: none; /* JS hides it when unsupported */ 
     grid-template-areas:
       "banner banner"
       "voice voice"
-      "table boards";
+      "table boards"
+      "actions actions";
     gap: var(--board-gap);
     align-items: start;
   }
@@ -776,7 +765,7 @@ body.in-game .fs-btn.hidden { display: none; /* JS hides it when unsupported */ 
   #screen-game .voice-box { grid-area: voice; margin-bottom: 0; }
   #screen-game .table-area { grid-area: table; margin-bottom: 0; }
   #screen-game #boards { grid-area: boards; overflow-y: auto; max-height: calc(100dvh - 170px); }
-  #screen-game .game-actions { margin-top: 0; }
+  #screen-game .game-actions { grid-area: actions; margin-top: 0; }
 }
 
 /* ------------------------------------------------------- small phones --- */
