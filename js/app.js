@@ -547,6 +547,31 @@
       .join('');
   }
 
+  // Factories show their 4 tiles as a strict 2x2 grid of individual tiles
+  // (in factory order) so nothing can spill outside the disc. Each tile is
+  // its own button, but it carries the same data-* contract as a color
+  // group: tapping any tile selects that color's whole group.
+  function factoryGridHtml(tiles, source) {
+    var counts = {};
+    tiles.forEach(function (t) { counts[t] = (counts[t] || 0) + 1; });
+    var seen = {};
+    return tiles.map(function (color) {
+      var sel = selection && selection.color === color &&
+        selection.source.kind === 'factory' && selection.source.index === source.index;
+      var first = !seen[color];
+      seen[color] = true;
+      return '<button type="button" class="tile-group factory-tile' +
+        (canInteract() ? ' pickable' : '') + (sel ? ' selected' : '') + '"' +
+        ' data-kind="factory" data-index="' + source.index + '"' +
+        ' data-color="' + color + '"' +
+        (canInteract() ? '' : ' disabled') +
+        ' aria-label="' + counts[color] + ' ' + color + ' tiles">' +
+        tileHtml(color, true) +
+        (first && counts[color] > 1 ? '<span class="group-count">' + counts[color] + '</span>' : '') +
+        '</button>';
+    }).join('');
+  }
+
   function renderGame() {
     var s = session.state;
     if (!s) return;
@@ -581,7 +606,7 @@
     // --- factories ---
     $('#factories').innerHTML = s.factories.map(function (tiles, i) {
       return '<div class="factory' + (tiles.length ? '' : ' empty') + '">' +
-        (tiles.length ? groupsHtml(tiles, { kind: 'factory', index: i }, true)
+        (tiles.length ? factoryGridHtml(tiles, { kind: 'factory', index: i })
                       : '<span class="center-empty">empty</span>') +
         '</div>';
     }).join('');
