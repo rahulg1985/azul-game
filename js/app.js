@@ -43,6 +43,75 @@
   var highlight = {};   // "playerIdx:row:col" -> true for just-tiled cells
   var lastTurnKey = null; // "round:currentPlayer" — drives the turn-change animation
 
+  // ---------------------------------------------------------- sound & voice --
+  var soundOn = true;
+  try { soundOn = localStorage.getItem('azul-sound') !== 'off'; } catch (e) { /* ignore */ }
+  var audioCtx = null;
+  var speakTimer = null;
+
+  function ensureAudio() {
+    if (!soundOn) return null;
+    if (!audioCtx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      audioCtx = new AC();
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  // One ceramic "clack": a woody knock (pitch-dropping triangle) + a short
+  // filtered-noise click, like a tile tapped on a board.
+  function ceramicClack(delay, baseFreq, vol) {
+    if (!audioCtx) return;
+    var ctx = audioCtx;
+    var t = ctx.currentTime + delay;
+    var osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(baseFreq, t);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.55, t + 0.07);
+    var og = ctx.createGain();
+    og.gain.setValueAtTime(vol, t);
+    og.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+    osc.connect(og); og.connect(ctx.destination);
+    osc.start(t); osc.stop(t + 0.1);
+    var len = Math.max(1, Math.floor(ctx.sampleRate * 0.03));
+    var buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    var src = ctx.createBufferSource(); src.buffer = buf;
+    var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 1.1;
+    var ng = ctx.createGain(); ng.gain.value = vol * 0.9;
+    src.connect(bp); bp.connect(ng); ng.connect(ctx.destination);
+    src.start(t);
+  }
+
+  function playPickup() { if (ensureAudio()) { ceramicClack(0, 920, 0.20); ceramicClack(0.07, 1180, 0.12); } }
+  function playPutback() { if (ensureAudio()) ceramicClack(0, 700, 0.10); }
+  function playPlace() { if (ensureAudio()) { ceramicClack(0, 620, 0.30); ceramicClack(0.09, 540, 0.22); } }
+
+  // After the boards finish shuffling (~1s), announce whose turn it is.
+  function speakTurn(name) {
+    if (!soundOn || !('speechSynthesis' in window)) return;
+    if (speakTimer) clearTimeout(speakTimer);
+    speakTimer = setTimeout(function () {
+      try {
+        window.speechSynthesis.cancel();
+        var u = new SpeechSynthesisUtterance(name + '’s turn now');
+        u.rate = 1.02;
+        window.speechSynthesis.speak(u);
+      } catch (e) { /* ignore */ }
+    }, 1100);
+  }
+
+  function setSound(on) {
+    soundOn = on;
+    try { localStorage.setItem('azul-sound', on ? 'on' : 'off'); } catch (e) { /* ignore */ }
+    var b = $('#btn-sound');
+    if (b) b.textContent = on ? '🔊 Sound on' : '🔇 Sound off';
+    if (!on && ('speechSynthesis' in window)) window.speechSynthesis.cancel();
+  }
+
   function setHighlightFromResolve(state) {
     highlight = {};
     (state.lastResolve || []).forEach(function (sum, pi) {
@@ -457,6 +526,8 @@
       });
       var topBoard = $('#boards .board.turn');
       if (topBoard) topBoard.classList.add('turn-enter');
+      playPlace();
+      speakTurn(cur.name);
     }
   }
 
@@ -533,8 +604,10 @@
             selection.source.kind === source.kind &&
             (source.kind === 'center' || selection.source.index === source.index)) {
           selection = null; // tap again to put them back
+          playPutback();
         } else {
           selection = { source: source, color: color };
+          playPickup();
         }
         renderGame();
         return;
@@ -556,7 +629,15 @@
       }
     });
 
+    $('#btn-sound').addEventListener('click', function () {
+      setSound(!soundOn);
+      if (soundOn) playPickup();
+    });
+    setSound(soundOn);
+
     $('#btn-quit-game').addEventListener('click', function () {
+      if (speakTimer) clearTimeout(speakTimer);
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
       if (session && session.mode === 'online') {
         var code = session.code;
         var idx = session.playerIdx;
