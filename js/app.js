@@ -41,6 +41,7 @@
   var session = null;
   var selection = null; // { source: {kind, index?}, color }
   var highlight = {};   // "playerIdx:row:col" -> true for just-tiled cells
+  var lastTurnKey = null; // "round:currentPlayer" — drives the turn-change animation
 
   function setHighlightFromResolve(state) {
     highlight = {};
@@ -417,6 +418,18 @@
     $('#boards').innerHTML = order.map(function (pi) {
       return boardHtml(s, pi);
     }).join('');
+
+    // Turn changed? Animate the new player's board in at the top, pulse the
+    // banner and scroll it into view so nobody misses the switch.
+    var turnKey = s.round + ':' + s.currentPlayer + ':' + s.phase;
+    if (lastTurnKey !== null && turnKey !== lastTurnKey && s.phase === 'draft') {
+      var topBoard = $('#boards .board.turn');
+      if (topBoard) topBoard.classList.add('turn-enter');
+      var bannerEl = $('#turn-banner');
+      bannerEl.classList.add('pulse');
+      bannerEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    lastTurnKey = turnKey;
   }
 
   function boardHtml(s, pi) {

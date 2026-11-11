@@ -271,6 +271,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 .tile-group:disabled { cursor: default; }
 .tile-group.pickable:hover { border-color: var(--accent-2); background: rgba(99, 164, 236, .14); }
 .tile-group.selected { border-color: var(--gold); background: rgba(230, 172, 0, .18); }
+.tile-group.selected .tile { transform: translateY(-2px); }
 .tile-group .group-count {
   position: absolute; top: -8px; right: -8px;
   background: var(--accent); color: #fff;
@@ -286,7 +287,21 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
   border-radius: 7px;
   flex: none;
   position: relative;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .35), inset 0 -3px 6px rgba(0, 0, 0, .25), 0 2px 5px rgba(0, 0, 0, .5);
+  transition: transform .15s ease;
+  box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, .55),
+    inset 0 -5px 7px rgba(0, 0, 0, .35),
+    inset 2px 0 3px rgba(255, 255, 255, .20),
+    inset -3px 0 4px rgba(0, 0, 0, .20),
+    0 3px 0 rgba(0, 0, 0, .30),
+    0 6px 9px rgba(0, 0, 0, .45);
+}
+.tile::after {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255, 255, 255, .34) 0%, rgba(255, 255, 255, .05) 38%, rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, .10) 100%);
 }
 .tile.mini { width: var(--tile-mini); height: var(--tile-mini); border-radius: 5px; }
 /* Original azulejo-style motifs (hand-drawn SVG, traditional patterns). */
@@ -322,6 +337,25 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
   box-shadow: 0 0 0 1.5px #0b1220, 0 10px 24px rgba(0, 0, 0, .5);
 }
 .board.turn { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(230, 172, 0, .65), 0 10px 24px rgba(0, 0, 0, .5); }
+
+/* Turn change: incoming board slides in at the top with a gold glow; banner pulses. */
+@keyframes boardIn {
+  0% { transform: translateY(34px) scale(.96); opacity: 0; }
+  60% { opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes turnGlow {
+  0% { box-shadow: 0 0 0 2px rgba(230, 172, 0, .65), 0 10px 24px rgba(0, 0, 0, .5); }
+  30% { box-shadow: 0 0 0 3px rgba(230, 172, 0, .95), 0 0 44px rgba(230, 172, 0, .65), 0 10px 24px rgba(0, 0, 0, .5); }
+  100% { box-shadow: 0 0 0 2px rgba(230, 172, 0, .65), 0 10px 24px rgba(0, 0, 0, .5); }
+}
+.board.turn-enter { animation: boardIn .55s ease both, turnGlow 1.3s ease both; }
+@keyframes bannerPulse {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+.turn-banner.pulse { animation: bannerPulse .6s ease; }
 .board-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
 .board-name { font-weight: 800; font-size: 1.05rem; }
 .board-name .you { color: #2f6fd0; font-size: .8rem; font-weight: 700; }
@@ -374,6 +408,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 .wall-cell.ghost-black  { background-color: #20242c; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%2320242c'/%3E%3Cg fill='%2345b7c9'%3E%3Cg id='r'%3E%3Cellipse cx='0' cy='-5' rx='2.8' ry='5.2'/%3E%3Cellipse cx='0' cy='5' rx='2.8' ry='5.2'/%3E%3Cellipse cx='-5' cy='0' rx='5.2' ry='2.8'/%3E%3Cellipse cx='5' cy='0' rx='5.2' ry='2.8'/%3E%3Ccircle r='1.7'/%3E%3C/g%3E%3Cuse href='%23r' transform='translate(12.5 12.5)'/%3E%3Cuse href='%23r' transform='translate(37.5 12.5)'/%3E%3Cuse href='%23r' transform='translate(62.5 12.5)'/%3E%3Cuse href='%23r' transform='translate(87.5 12.5)'/%3E%3Cuse href='%23r' transform='translate(12.5 37.5)'/%3E%3Cuse href='%23r' transform='translate(37.5 37.5)'/%3E%3Cuse href='%23r' transform='translate(62.5 37.5)'/%3E%3Cuse href='%23r' transform='translate(87.5 37.5)'/%3E%3Cuse href='%23r' transform='translate(12.5 62.5)'/%3E%3Cuse href='%23r' transform='translate(37.5 62.5)'/%3E%3Cuse href='%23r' transform='translate(62.5 62.5)'/%3E%3Cuse href='%23r' transform='translate(87.5 62.5)'/%3E%3Cuse href='%23r' transform='translate(12.5 87.5)'/%3E%3Cuse href='%23r' transform='translate(37.5 87.5)'/%3E%3Cuse href='%23r' transform='translate(62.5 87.5)'/%3E%3Cuse href='%23r' transform='translate(87.5 87.5)'/%3E%3Crect x='21.5' y='21.5' width='7' height='7' transform='rotate(45 25 25)'/%3E%3Crect x='71.5' y='21.5' width='7' height='7' transform='rotate(45 75 25)'/%3E%3Crect x='21.5' y='71.5' width='7' height='7' transform='rotate(45 25 75)'/%3E%3Crect x='71.5' y='71.5' width='7' height='7' transform='rotate(45 75 75)'/%3E%3Crect x='46.5' y='46.5' width='7' height='7' transform='rotate(45 50 50)'/%3E%3C/g%3E%3C/svg%3E"); box-shadow: inset 0 0 0 100px rgba(246, 239, 221, .55); }
 .wall-cell.ghost-cyan   { background-color: #4fb3c4; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%234fb3c4'/%3E%3Cg fill='%23ffffff'%3E%3Cpath d='M50 2 C56 19, 58.5 33, 50 47 C41.5 33, 44 19, 50 2 Z'/%3E%3Cpath d='M50 2 C56 19, 58.5 33, 50 47 C41.5 33, 44 19, 50 2 Z' transform='rotate(90 50 50)'/%3E%3Cpath d='M50 2 C56 19, 58.5 33, 50 47 C41.5 33, 44 19, 50 2 Z' transform='rotate(180 50 50)'/%3E%3Cpath d='M50 2 C56 19, 58.5 33, 50 47 C41.5 33, 44 19, 50 2 Z' transform='rotate(270 50 50)'/%3E%3Cpath d='M50 13 C54.5 25, 55.5 34, 50 44 C44.5 34, 45.5 25, 50 13 Z' transform='rotate(45 50 50)'/%3E%3Cpath d='M50 13 C54.5 25, 55.5 34, 50 44 C44.5 34, 45.5 25, 50 13 Z' transform='rotate(135 50 50)'/%3E%3Cpath d='M50 13 C54.5 25, 55.5 34, 50 44 C44.5 34, 45.5 25, 50 13 Z' transform='rotate(225 50 50)'/%3E%3Cpath d='M50 13 C54.5 25, 55.5 34, 50 44 C44.5 34, 45.5 25, 50 13 Z' transform='rotate(315 50 50)'/%3E%3C/g%3E%3Crect x='43.5' y='43.5' width='13' height='13' fill='%234fb3c4' transform='rotate(45 50 50)'/%3E%3Ccircle cx='50' cy='50' r='3.2' fill='%23ffffff'/%3E%3C/svg%3E"); box-shadow: inset 0 0 0 100px rgba(246, 239, 221, .52); }
 .wall-cell.filled { border-color: transparent; box-shadow: none; }
+.wall-cell.filled .tile { box-shadow: inset 0 1px 2px rgba(255, 255, 255, .45), inset 0 -2px 3px rgba(0, 0, 0, .30); }
+.wall-cell.filled .tile::after { opacity: .5; }
 .wall-cell.just-placed { animation: pop .5s ease; }
 @keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
 
