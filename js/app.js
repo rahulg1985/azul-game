@@ -686,35 +686,47 @@
       return boardHtml(s, pi);
     }).join('');
 
-    // Turn changed? FLIP-animate every board from its old spot to its new
-    // one: the old board glides down, the next player's board glides up
-    // into place — like the boards are being shuffled by hand (~1s).
+    // Turn changed? Hand-shuffle the two boards involved: the previous
+    // player's board slowly sinks down to its new slot while the next
+    // player's board slowly rises up into the top slot — a long, even,
+    // pure-vertical glide (no scaling, so nothing squashes), like the
+    // boards are being shuffled by hand. Other boards stay put.
     var turnKey = s.round + ':' + s.currentPlayer + ':' + s.phase;
     var turnChanged = lastTurnKey !== null && turnKey !== lastTurnKey && s.phase === 'draft';
+    var prevPlayer = null;
+    if (lastTurnKey) {
+      var keyParts = lastTurnKey.split(':');
+      if (keyParts.length === 3) prevPlayer = parseInt(keyParts[1], 10);
+    }
     lastTurnKey = turnKey;
     if (turnChanged) {
       var bannerEl = $('#turn-banner');
       bannerEl.classList.add('pulse');
-      bannerEl.scrollIntoView({ block: 'start' });
+      try {
+        bannerEl.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      } catch (e) {
+        bannerEl.scrollIntoView({ block: 'start' });
+      }
       if (!REDUCED_MOTION) {
-        boardsEl.querySelectorAll('.board').forEach(function (b) {
+        var inBoard = boardsEl.querySelector('.board.turn');
+        var outBoard = prevPlayer !== null && prevPlayer !== s.currentPlayer
+          ? boardsEl.querySelector('.board[data-player="' + prevPlayer + '"]') : null;
+        [inBoard, outBoard].forEach(function (b) {
+          if (!b || !b.animate) return;
           var old = prevRects[b.dataset.player];
-          if (!old || !b.animate) return;
+          if (!old) return;
           var nr = b.getBoundingClientRect();
           var dx = old.left - (nr.left + window.scrollX);
           var dy = old.top - (nr.top + window.scrollY);
-          var sx = old.width / nr.width;
-          var sy = old.height / nr.height;
-          if (!dx && !dy && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) return;
+          if (!dx && !dy) return;
           b.style.zIndex = b.classList.contains('turn') ? 3 : 2;
           var anim = b.animate([
-            { transform: 'translate(' + dx + 'px, ' + dy + 'px) scale(' + sx + ', ' + sy + ')' },
-            { transform: 'translate(0px, 0px) scale(1, 1)' }
-          ], { duration: 1000, easing: 'cubic-bezier(.3, .7, .3, 1)' });
+            { transform: 'translate(' + dx + 'px, ' + dy + 'px)' },
+            { transform: 'translate(0px, 0px)' }
+          ], { duration: 1600, easing: 'cubic-bezier(.4, .1, .3, 1)' });
           anim.onfinish = function () { b.style.zIndex = ''; };
         });
-        var topBoard = $('#boards .board.turn');
-        if (topBoard) topBoard.classList.add('turn-enter');
+        if (inBoard) inBoard.classList.add('turn-enter');
       }
       playPlace();
       if (!justEndedRound) speakTurn(cur.name); // round-end dictation takes over
