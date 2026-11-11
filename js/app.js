@@ -64,7 +64,7 @@
     if (!b) return;
     var inFs = !!document.fullscreenElement;
     b.textContent = inFs ? '🗗' : '⛶';
-    b.setAttribute('aria-label', inFs ? 'Exit full screen' : 'Enter full screen');
+    b.setAttribute('aria-label', inFs ? 'Exit Full Screen' : 'Full Screen');
   }
 
   function isStandalone() {
@@ -276,7 +276,7 @@
     soundOn = on;
     try { localStorage.setItem('azul-sound', on ? 'on' : 'off'); } catch (e) { /* ignore */ }
     var b = $('#btn-sound');
-    if (b) b.textContent = on ? '🔊 Sound on' : '🔇 Sound off';
+    if (b) b.textContent = on ? '🔊 Sound On' : '🔇 Sound Off';
     if (!on && ('speechSynthesis' in window)) window.speechSynthesis.cancel();
   }
 
@@ -1243,7 +1243,7 @@
         muteBtn.textContent = snap.muted ? '🔊 Unmute' : '🔇 Mute';
       }
       if (toggleBtn) {
-        toggleBtn.textContent = (snap.active || snap.joining) ? 'Leave voice' : 'Enable voice';
+        toggleBtn.textContent = (snap.active || snap.joining) ? 'Leave Voice' : 'Enable Voice';
       }
     });
   }

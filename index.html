@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Azul">
 <link rel="apple-touch-icon" href="assets/logo.jpg">
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="css/styles.css?v=43">
+<link rel="stylesheet" href="css/styles.css?v=44">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%232f6fd0'/><rect x='26' y='26' width='48' height='48' rx='8' transform='rotate(45 50 50)' fill='%23f5f1e6'/></svg>">
 </head>
 <body>
@@ -26,9 +26,9 @@
   <section id="screen-home" class="screen">
     <div id="home-chooser" class="card">
       <h2>How would you like to play?</h2>
-      <button id="btn-mode-local" class="btn primary big mode-btn">🏠 Play locally<span class="mode-sub">2–4 players · Pass &amp; play</span></button>
-      <button id="btn-mode-online" class="btn primary big mode-btn">🌐 Play online<span class="mode-sub">Create a room and invite friends</span></button>
-      <button id="btn-how" class="btn subtle">How to play</button>
+      <button id="btn-mode-local" class="btn primary big mode-btn">🏠 Play Locally<span class="mode-sub">2–4 players · Pass &amp; play</span></button>
+      <button id="btn-mode-online" class="btn primary big mode-btn">🌐 Play Online<span class="mode-sub">Create a room and invite friends</span></button>
+      <button id="btn-how" class="btn subtle">How to Play</button>
       <div id="how-panel" class="how-panel hidden">
         <p class="how-intro">Azul is a game of beautiful tiles and careful choices. Draft tiles from the factories, complete pattern lines, and build the most beautiful wall in the palace.</p>
 
@@ -112,8 +112,8 @@
           <button type="button" class="btn-remove-player" data-index="3" aria-label="Remove player 4">✕</button>
         </div>
       </div>
-      <button type="button" id="btn-add-player" class="btn subtle">＋ Add player</button>
-      <button id="btn-local-start" class="btn primary big">Start game</button>
+      <button type="button" id="btn-add-player" class="btn subtle">＋ Add Player</button>
+      <button id="btn-local-start" class="btn primary big">Start Game</button>
     </div>
 
     <div class="card hidden" id="setup-online">
@@ -128,10 +128,10 @@
         <label class="field-label" for="online-name">Your name</label>
         <input type="text" id="online-name" maxlength="16" placeholder="Your name" autocomplete="off">
         <p id="invite-note" class="invite-note hidden"></p>
-        <button id="btn-create-room" class="btn primary big">Create room</button>
+        <button id="btn-create-room" class="btn primary big">Create Room</button>
         <div class="join-row">
           <input type="text" id="join-code" maxlength="6" placeholder="Room code" autocomplete="off" autocapitalize="characters">
-          <button id="btn-join-room" class="btn">Join room</button>
+          <button id="btn-join-room" class="btn">Join Room</button>
         </div>
       </div>
     </div>
@@ -146,22 +146,22 @@
       <p class="card-sub">Share the invite link — friends tap it, enter a name, and they’re in.</p>
       <div class="invite-row">
         <input type="text" id="invite-link" readonly>
-        <button id="btn-copy-link" class="btn primary">Copy invite link</button>
+        <button id="btn-copy-link" class="btn primary">Copy Invite Link</button>
       </div>
       <h3 class="lobby-players-title">Players <span id="lobby-count"></span></h3>
       <ul id="lobby-players" class="lobby-players"></ul>
       <p id="lobby-status" class="lobby-status"></p>
-      <button id="btn-start-online" class="btn primary big hidden">Start game</button>
+      <button id="btn-start-online" class="btn primary big hidden">Start Game</button>
       <div class="voice-box">
         <div class="voice-head">🎙️ Voice chat <span class="voice-status"></span></div>
         <div class="voice-members"></div>
         <div class="voice-controls">
           <button type="button" class="btn btn-voice-mute">🔇 Mute</button>
-          <button type="button" class="btn subtle btn-voice-toggle">Leave voice</button>
+          <button type="button" class="btn subtle btn-voice-toggle">Leave Voice</button>
         </div>
         <p class="voice-note">Voice chat joins automatically in online rooms — headphones recommended.</p>
       </div>
-      <button id="btn-leave-room" class="btn subtle">Leave room</button>
+      <button id="btn-leave-room" class="btn subtle">Leave Room</button>
     </div>
   </section>
 
@@ -174,7 +174,7 @@
       <div class="voice-members"></div>
       <div class="voice-controls">
         <button type="button" class="btn btn-voice-mute">🔇 Mute</button>
-        <button type="button" class="btn subtle btn-voice-toggle">Leave voice</button>
+        <button type="button" class="btn subtle btn-voice-toggle">Leave Voice</button>
       </div>
     </div>
 
@@ -189,8 +189,8 @@
     <div id="boards" class="boards"></div>
 
     <div class="game-actions">
-      <button id="btn-sound" class="btn subtle">🔊 Sound on</button>
-      <button id="btn-quit-game" class="btn subtle">Leave game</button>
+      <button id="btn-sound" class="btn subtle">🔊 Sound On</button>
+      <button id="btn-quit-game" class="btn subtle">Leave Game</button>
     </div>
 
     <div id="celebration" class="celebration hidden">
@@ -206,9 +206,9 @@
       <img class="congrats-gif" src="assets/congrats.gif" alt="Congratulations!">
       <h2 id="gameover-title">Game over</h2>
       <div id="gameover-results"></div>
-      <button id="btn-play-again" class="btn primary big">Play again</button>
+      <button id="btn-play-again" class="btn primary big">Play Again</button>
       <p id="play-again-note" class="lobby-status hidden">Waiting for the host to start a new game…</p>
-      <button id="btn-gameover-home" class="btn subtle">Back to home</button>
+      <button id="btn-gameover-home" class="btn subtle">Main Menu</button>
     </div>
   </section>
 </main>
@@ -226,7 +226,7 @@
 
 <canvas id="fireworks" class="hidden"></canvas>
 
-<button type="button" id="btn-fullscreen" class="fs-btn hidden" aria-label="Full screen">⛶</button>
+<button type="button" id="btn-fullscreen" class="fs-btn hidden" aria-label="Full Screen">⛶</button>
 
 <div id="fs-help" class="fs-help hidden" role="dialog" aria-label="How to play in full screen">
   <div class="fs-help-card">
@@ -237,14 +237,14 @@
       <li>Choose <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
       <li>Open <strong>Azul</strong> from your home screen — it plays in full screen, with no browser bars.</li>
     </ol>
-    <button type="button" id="btn-fs-help-close" class="btn primary">Got it</button>
+    <button type="button" id="btn-fs-help-close" class="btn primary">Got It</button>
   </div>
 </div>
 
-<script src="js/engine.js?v=43"></script>
+<script src="js/engine.js?v=44"></script>
 <!-- js/config.js is an ES module; js/online.js imports it on demand. -->
-<script src="js/online.js?v=43"></script>
-<script src="js/voice.js?v=43"></script>
-<script src="js/app.js?v=43"></script>
+<script src="js/online.js?v=44"></script>
+<script src="js/voice.js?v=44"></script>
+<script src="js/app.js?v=44"></script>
 </body>
 </html>
