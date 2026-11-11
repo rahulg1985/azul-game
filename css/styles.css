@@ -287,7 +287,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
   border: 1px solid #3f74b8;
   border-radius: 10px;
   padding: 4px 10px;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   box-shadow: 0 8px 22px rgba(0, 0, 0, .5);
 }
 .turn-banner .turn-main { font-size: .98rem; font-weight: 800; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -310,9 +310,9 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 }
 
 /* ----------------------------------------------------------------- table */
-.table-area { padding: 3px 6px 2px; }
+.table-area { padding: 1px 6px 0; }
 .table-title {
-  margin: 0 0 2px;
+  margin: 0;
   line-height: 1.1;
   font-size: .78rem;
   letter-spacing: .12em;
