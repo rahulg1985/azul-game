@@ -310,7 +310,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 }
 
 /* ----------------------------------------------------------------- table */
-.table-area { padding: 0 6px; margin-bottom: 6px; }
+.table-area { padding: 2px 6px 0; margin-bottom: 6px; }
 .table-title {
   margin: 0;
   line-height: 1.1;

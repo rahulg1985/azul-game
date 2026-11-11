@@ -106,6 +106,9 @@
   // }
   var session = null;
   var selection = null; // { source: {kind, index?}, color }
+  var remoteSel = null; // another player's live selection (online): {by, kind, index, color}
+  var remoteReplay = null; // a remote move being replayed here: {id, by, landed, stash, timer}
+  var lastRemoteMoveId = null;
   var flying = false; // tile flight animation in progress (input locked)
   var holdNextSwitch = false; // pause 1s after a flight lands, before the switch
   var switchHoldSeq = 0; // invalidates a stale held switch after re-renders
@@ -475,11 +478,20 @@
     highlight = {};
     session.unwatch = window.AzulOnline.watchRoom(code, onRoomUpdate);
     show('screen-lobby');
+    resetLiveState();
     voiceOptOut = false;
     startVoiceAuto(); // voice chat is on by default in online rooms
   }
 
+  function resetLiveState() {
+    if (remoteReplay && remoteReplay.timer) clearTimeout(remoteReplay.timer);
+    remoteReplay = null;
+    remoteSel = null;
+    lastRemoteMoveId = null;
+  }
+
   function leaveRoomWatch() {
+    resetLiveState();
     if (window.AzulVoice) window.AzulVoice.leave();
     dismissRoundOverlay();
     stopCelebration();
@@ -487,6 +499,80 @@
       session.unwatch();
       session.unwatch = null;
     }
+  }
+
+  // A cheap fingerprint of the parts of the state a move can change —
+  // used to tell a real state change apart from a live-field echo.
+  function stateKey(st) {
+    if (!st) return '';
+    return st.round + ':' + st.currentPlayer + ':' + st.phase + '|' +
+      st.factories.map(function (f) { return f.length; }).join(',') + '|' +
+      st.center.length + '|' +
+      st.players.map(function (p) {
+        return p.score + '/' +
+          p.patternLines.map(function (l) { return l.length; }).join('') + '/' +
+          p.floor.length;
+      }).join('|');
+  }
+
+  // Live play-by-play from the room: another player's selection shows on
+  // this screen as they decide, and their move announcement starts the
+  // same flight here before the new state is applied.
+  function handleLive(room) {
+    var live = room.live || {};
+    var sel = live.sel || null;
+    remoteSel = (sel && sel.by !== session.playerIdx)
+      ? { by: sel.by, kind: sel.kind, index: sel.index, color: sel.color }
+      : null;
+    var mv = live.move || null;
+    if (!mv || mv.by === session.playerIdx || mv.id === lastRemoteMoveId) return;
+    if (!session.state || session.state.phase !== 'draft') return;
+    if (mv.by !== session.state.currentPlayer) return;
+    if (remoteReplay || flying) return;
+    // If the state already moved on, the announcement is stale news.
+    if (stateKey(window.AzulEngine.normalize(room.state)) !== stateKey(session.state)) return;
+    lastRemoteMoveId = mv.id;
+    startRemoteReplay(mv);
+  }
+
+  function startRemoteReplay(mv) {
+    var sel = {
+      source: mv.kind === 'factory'
+        ? { kind: 'factory', index: mv.index } : { kind: 'center' },
+      color: mv.color
+    };
+    remoteSel = null; // the selection is being placed now
+    remoteReplay = { id: mv.id, by: mv.by, landed: false, stash: null, timer: null };
+    flying = true; // input lock, same as the mover's screen during a flight
+    var started = flyTilesForMove(sel, mv.dest, mv.by, function () {
+      if (!remoteReplay || remoteReplay.id !== mv.id) return;
+      remoteReplay.landed = true;
+      if (remoteReplay.stash) finishRemoteReplay();
+    });
+    if (!started) { // nothing to fly with on this screen — don't wedge
+      remoteReplay = null;
+      flying = false;
+      return;
+    }
+    remoteReplay.timer = setTimeout(function () {
+      if (!remoteReplay || remoteReplay.id !== mv.id) return;
+      if (remoteReplay.stash) { finishRemoteReplay(); return; }
+      // The mover's move never landed (rejected?) — just resync.
+      remoteReplay = null;
+      flying = false;
+      renderGame();
+    }, 6000);
+  }
+
+  function finishRemoteReplay() {
+    var st = remoteReplay && remoteReplay.stash;
+    if (!st) return;
+    if (remoteReplay.timer) clearTimeout(remoteReplay.timer);
+    remoteReplay = null;
+    // Same landing as the mover's screen: apply the move, hold the old
+    // arrangement for a second, then the boards switch and announce.
+    holdNextSwitch = true;
+    applyGameRoom(st, window.AzulEngine.normalize(st.state));
   }
 
   function onRoomUpdate(room) {
@@ -515,9 +601,27 @@
       return;
     }
 
-    var prev = session.state;
+    handleLive(room);
+
     // RTDB round-trips prune empty arrays — repair before rendering.
-    session.state = window.AzulEngine.normalize(room.state);
+    var incoming = window.AzulEngine.normalize(room.state);
+    var changed = stateKey(incoming) !== stateKey(session.state);
+    if (remoteReplay) {
+      // A move is being replayed on this screen: hold the new state
+      // until the flight lands, then apply it with the usual pause.
+      if (changed) {
+        remoteReplay.stash = room;
+        if (remoteReplay.landed) finishRemoteReplay();
+      }
+      return;
+    }
+    if (flying && !changed) return; // my own live-write echo, mid-flight
+    applyGameRoom(room, incoming);
+  }
+
+  function applyGameRoom(room, incoming) {
+    var prev = session.state;
+    session.state = incoming;
 
     if (!prev || prev.round !== session.state.round || session.state.phase === 'finished') {
       if (session.state.lastResolve) setHighlightFromResolve(session.state);
@@ -616,14 +720,32 @@
     return session.state.currentPlayer === session.playerIdx;
   }
 
+  // The selection the board painters show: my own while I am deciding,
+  // otherwise the live selection of the player whose turn it is, so in
+  // online games everyone watches the same group get picked up.
+  function visibleSelection() {
+    if (selection) return selection;
+    if (remoteSel && session && session.state &&
+        session.state.phase === 'draft' &&
+        remoteSel.by === session.state.currentPlayer) {
+      return {
+        source: remoteSel.kind === 'factory'
+          ? { kind: 'factory', index: remoteSel.index } : { kind: 'center' },
+        color: remoteSel.color
+      };
+    }
+    return null;
+  }
+
   function tileHtml(color, mini) {
     return '<span class="tile tile-' + color + (mini ? ' mini' : '') + '"></span>';
   }
 
   function groupHtml(source, color, count, mini) {
-    var sel = selection && selection.color === color &&
-      selection.source.kind === source.kind &&
-      (source.kind === 'center' || selection.source.index === source.index);
+    var vs = visibleSelection();
+    var sel = vs && vs.color === color &&
+      vs.source.kind === source.kind &&
+      (source.kind === 'center' || vs.source.index === source.index);
     var tiles = '';
     for (var i = 0; i < count; i++) tiles += tileHtml(color, mini);
     return '<button type="button" class="tile-group' +
@@ -675,8 +797,9 @@
           ((p >> 1) === (cur >> 1) && (p & 1) > (cur & 1))) badgeAt[color] = p;
     });
     return placed.map(function (color, p) {
-      var sel = selection && selection.color === color &&
-        selection.source.kind === 'factory' && selection.source.index === source.index;
+      var vs = visibleSelection();
+      var sel = vs && vs.color === color &&
+        vs.source.kind === 'factory' && vs.source.index === source.index;
       return '<button type="button" class="tile-group factory-tile' +
         (canInteract() ? ' pickable' : '') + (sel ? ' selected' : '') + '"' +
         ' data-kind="factory" data-index="' + source.index + '"' +
@@ -908,8 +1031,9 @@
           : '<span class="slot"></span>';
       }
       var cls = 'pline';
-      if (interact && selection) {
-        cls += E.isLineLegal(s, pi, selection.color, i) ? ' droppable' : ' blocked';
+      var lineSel = isTurnBoard ? visibleSelection() : null;
+      if (lineSel) {
+        cls += E.isLineLegal(s, pi, lineSel.color, i) ? ' droppable' : ' blocked';
       }
       lines += '<div class="' + cls + '" data-owner="' + pi + '" data-dest-line="' + i + '">' + slots + '</div>';
     }
@@ -958,7 +1082,7 @@
       '<div class="board-main"><div class="pattern-lines">' + lines + '</div>' +
       '<div class="wall">' + wall + '</div></div>' +
       '<div class="floor-line">' +
-      '<div class="floor-slots' + (interact && selection ? ' droppable' : '') +
+      '<div class="floor-slots' + (lineSel ? ' droppable' : '') +
       '" data-owner="' + pi + '" data-dest-floor="1">' + floorSlots + '</div></div>' +
       '</div>';
   }
@@ -1001,6 +1125,14 @@
           playPickup();
         }
         renderGame();
+        if (session.mode === 'online' && window.AzulOnline.setLiveSelection) {
+          window.AzulOnline.setLiveSelection(session.code, selection ? {
+            by: session.playerIdx,
+            kind: selection.source.kind,
+            index: selection.source.kind === 'factory' ? selection.source.index : 0,
+            color: selection.color
+          } : null);
+        }
         return;
       }
 
@@ -1050,23 +1182,79 @@
   // everyone can take in what was played.
   function flyAndMove(dest, targetEl) {
     if (flying || !selection) return;
-    var tiles = [];
-    document.querySelectorAll('#screen-game .tile-group.selected').forEach(function (g) {
-      g.querySelectorAll('.tile').forEach(function (t) { tiles.push(t); });
-    });
-    // NOTE: no reduced-motion skip here — the flight is a requested
-    // feature; the OS setting silently killed it on the user's phone.
-    if (!tiles.length || !targetEl || !tiles[0].animate) {
-      attemptMove(dest);
-      return;
+    var sel = { source: selection.source, color: selection.color };
+    if (session.mode === 'online') {
+      // Announce the move as its flight starts, so the other players'
+      // screens replay the same flight with the same timing and switch
+      // the turn only after it lands. The selection is consumed.
+      if (window.AzulOnline.setLiveMove) {
+        window.AzulOnline.setLiveMove(session.code, {
+          by: session.playerIdx,
+          kind: sel.source.kind,
+          index: sel.source.kind === 'factory' ? sel.source.index : 0,
+          color: sel.color,
+          dest: dest,
+          id: Date.now() + ':' + session.playerIdx
+        });
+      }
+      if (window.AzulOnline.setLiveSelection) {
+        window.AzulOnline.setLiveSelection(session.code, null);
+      }
     }
     flying = true;
+    var started = flyTilesForMove(sel, dest, session.state.currentPlayer, function () {
+      holdNextSwitch = true;
+      attemptMove(dest);
+    });
+    if (!started) {
+      flying = false;
+      attemptMove(dest);
+    }
+  }
+
+  // The flight itself, shared by the mover and by remote screens
+  // replaying the mover's announcement: the picked tiles arc into the
+  // exact slots they will occupy on the mover's board (overflow to the
+  // floor), factory leftovers arc into the center at the same time, the
+  // source tiles are hidden while their copies fly, and onLanded runs
+  // the moment the flight lands. Returns false when there is nothing to
+  // fly with (elements missing / no animation support).
+  function flyTilesForMove(sel, dest, moverIdx, onLanded) {
+    var s = session.state;
+    if (!s) return false;
+
+    // Source tiles: the picked color group in its factory / the center.
+    var tiles = [];
+    var factoryEl = null;
+    var pileEl = null;
+    if (sel.source.kind === 'factory') {
+      factoryEl = document.querySelectorAll('#factories .factory')[sel.source.index] || null;
+      pileEl = factoryEl;
+    } else {
+      pileEl = $('#center-pile');
+    }
+    if (pileEl) {
+      pileEl.querySelectorAll('.tile-group').forEach(function (g) {
+        if (g.dataset.color === sel.color) {
+          g.querySelectorAll('.tile').forEach(function (t) { tiles.push(t); });
+        }
+      });
+    }
+    var board = document.querySelector('.board[data-player="' + moverIdx + '"]');
+    var targetEl = null;
+    if (board) {
+      targetEl = dest === 'floor'
+        ? board.querySelector('.floor-slots')
+        : board.querySelector('[data-dest-line="' + dest + '"]');
+    }
+    // NOTE: no reduced-motion skip here — the flight is a requested
+    // feature; the OS setting silently killed it on the user's phone.
+    if (!tiles.length || !targetEl || !tiles[0].animate) return false;
     playWhoosh();
 
     // Landing spots: the exact slots the tiles are about to occupy
     // (overflow past a full pattern line runs to the floor line).
-    var s = session.state;
-    var cur = s.players[s.currentPlayer];
+    var cur = s.players[moverIdx];
     function spotCenter(el, fallbackEl, fx) {
       var r = (el || fallbackEl).getBoundingClientRect();
       return el
@@ -1083,7 +1271,6 @@
       if (i < free) {
         return spotCenter(targetEl.querySelectorAll('.slot')[lineLen + i], targetEl, 0.8);
       }
-      var board = targetEl.closest('.board');
       var ofSlot = board
         ? board.querySelectorAll('.floor-slot')[cur.floor.length + (i - free)] : null;
       return spotCenter(ofSlot, targetEl, 0.8);
@@ -1133,15 +1320,15 @@
     // The factory's leftover tiles fly to the center pile at the same
     // time, fanning into the middle of the pile.
     var leftoverCount = 0;
-    if (selection.source.kind === 'factory') {
-      var srcGroup = tiles[0].closest('.tile-group');
-      var factoryEl = srcGroup && srcGroup.closest('.factory');
+    if (sel.source.kind === 'factory' && factoryEl) {
       var centerEl = $('#center-pile');
-      if (factoryEl && centerEl) {
+      if (centerEl) {
         var cr = centerEl.getBoundingClientRect();
         var leftTiles = [];
-        factoryEl.querySelectorAll('.tile-group:not(.selected) .tile')
-          .forEach(function (t) { leftTiles.push(t); });
+        factoryEl.querySelectorAll('.tile-group').forEach(function (g) {
+          if (g.dataset.color === sel.color) return;
+          g.querySelectorAll('.tile').forEach(function (t) { leftTiles.push(t); });
+        });
         leftoverCount = leftTiles.length;
         leftTiles.forEach(function (t) {
           var g = t.closest('.tile-group');
@@ -1155,16 +1342,18 @@
         });
       }
     }
-    // Land -> the move applies at once (tiles take their real positions,
-    // selection clears) -> renderGame holds the turn switch for 1s.
+    // Land -> onLanded: for the mover the move applies at once (tiles
+    // take their real positions, selection clears) and renderGame holds
+    // the turn switch for 1s; remote screens do the same with the state
+    // that arrived from the mover's transaction.
     setTimeout(function () {
       document.querySelectorAll('.tile-away').forEach(function (el) {
         el.classList.remove('tile-away');
       });
       clones.forEach(function (c) { c.remove(); });
-      holdNextSwitch = true;
-      attemptMove(dest);
+      onLanded();
     }, FLIGHT_MS + (Math.max(tiles.length, leftoverCount) - 1) * 90);
+    return true;
   }
 
   function attemptMove(dest) {

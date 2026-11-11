@@ -12,6 +12,13 @@
  *     meta:    { hostIdx: 0, status: 'lobby'|'playing'|'finished', createdAt },
  *     players: ['Name', ...],                 // seat order; index = playerIdx
  *     state:   <AzulEngine state JSON | null> // null while in the lobby
+ *     live:    { sel, move }                  // ephemeral play-by-play:
+ *                                             // the current player's tile
+ *                                             // selection and move
+ *                                             // announcements, so every
+ *                                             // screen replays the same
+ *                                             // flight before the turn
+ *                                             // switches (see app.js)
  *   }
  *
  * Moves are applied with a transaction on rooms/{code}/state: the engine
@@ -266,6 +273,30 @@
     }
   }
 
+  // Ephemeral play-by-play (fire-and-forget): the current player's tile
+  // selection, so the other screens can highlight the same group while
+  // they decide. Cleared with null when the selection is put back or a
+  // move starts.
+  function setLiveSelection(code, sel) {
+    if (!db) return;
+    var ref = roomRef(code).child('live/sel');
+    if (sel) {
+      ref.set(sel).catch(function () { /* ignore */ });
+      ref.onDisconnect().remove();
+    } else {
+      ref.remove().catch(function () { /* ignore */ });
+    }
+  }
+
+  // Announce a move the moment its flight starts, so the other screens
+  // replay the flight with the same timing and only apply the new state
+  // (which arrives separately through the move transaction) once their
+  // flight lands. `id` makes each announcement unique.
+  function setLiveMove(code, mv) {
+    if (!db) return;
+    roomRef(code).child('live/move').set(mv).catch(function () { /* ignore */ });
+  }
+
   // Host taps on the celebration screen: flag it so every player
   // leaves the celebration and returns home together.
   function endCelebration(code) {
@@ -280,6 +311,8 @@
     watchRoom: watchRoom,
     startGame: startGame,
     submitMove: submitMove,
+    setLiveSelection: setLiveSelection,
+    setLiveMove: setLiveMove,
     endCelebration: endCelebration,
     leaveRoom: leaveRoom,
     storedSeat: storedSeat,
