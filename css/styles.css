@@ -826,6 +826,15 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 .fs-help-card ol { margin: 0 0 16px; padding-left: 22px; line-height: 1.55; }
 .fs-help-card li { margin: 4px 0; }
 .fs-help-card .btn { width: 100%; }
+.sc-line { margin: 2px 0; font-size: .88rem; text-align: left; word-break: break-word; }
+.sc-btns { display: flex; gap: 8px; margin: 12px 0; }
+.sc-btns .btn { flex: 1; width: auto; }
+.audio-log {
+  background: #0b1220; color: #bfe3cd; border: 1px solid var(--line, #2b4365);
+  font-size: .72rem; line-height: 1.5; padding: 8px 10px; border-radius: 8px;
+  max-height: 150px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;
+  text-align: left; margin: 0 0 12px;
+}
 
 /* ------------------------------------------------- landscape phones ----- */
 @media (orientation: landscape) and (max-height: 540px) {

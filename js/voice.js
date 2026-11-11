@@ -78,6 +78,10 @@
       var AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
       S.ctx = new AC();
+      S.ctx.onstatechange = function () {
+        if (window.AzulAudioLog) window.AzulAudioLog('Voice sound engine: ' + S.ctx.state);
+      };
+      if (window.AzulAudioLog) window.AzulAudioLog('Voice sound engine: ' + S.ctx.state);
     } catch (e) { S.ctx = null; }
     return S.ctx;
   }
@@ -557,6 +561,7 @@
     updateIdentity: updateIdentity,
     unlockAudio: unlockAudio,
     isActive: function () { return S.active; },
+    ctxState: function () { return S.ctx ? S.ctx.state : 'Not started yet'; },
     snapshot: snapshot,
     setCallbacks: function (cb) {
       if (cb.onChange) S.onChange = cb.onChange;

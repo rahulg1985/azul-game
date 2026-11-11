@@ -97,6 +97,54 @@
     updateFsButton();
   }
 
+  // ---------------------------------------------------------- sound check --
+  function refreshSoundCheck() {
+    var b = $('#sc-browser');
+    if (!b) return;
+    b.textContent = navigator.userAgent;
+    $('#sc-ctx').textContent = audioCtx ? audioCtx.state : 'Not started yet';
+    var ss = window.speechSynthesis;
+    $('#sc-speech').textContent = !ss ? 'Not available in this browser'
+      : ss.speaking ? 'Speaking now'
+      : ss.pending ? 'Waiting to speak'
+      : ss.paused ? 'Paused'
+      : 'Ready';
+    var V = window.AzulVoice;
+    $('#sc-voice').textContent = V && V.ctxState ? V.ctxState() : '—';
+    var log = $('#audio-log');
+    if (log) log.textContent = audioLog.length ? audioLog.slice(-14).join('\n') : 'No audio events yet.';
+  }
+
+  function wireSoundCheck() {
+    document.querySelectorAll('.btn-sc-open').forEach(function (b) {
+      b.addEventListener('click', function () {
+        refreshSoundCheck();
+        $('#sound-check').classList.remove('hidden');
+      });
+    });
+    var close = $('#btn-sc-close');
+    if (close) close.addEventListener('click', function () {
+      $('#sound-check').classList.add('hidden');
+    });
+    var panel = $('#sound-check');
+    if (panel) panel.addEventListener('click', function (e) {
+      if (e.target === panel) panel.classList.add('hidden');
+    });
+    var testSound = $('#btn-sc-sound');
+    if (testSound) testSound.addEventListener('click', function () {
+      alog('Test sound tapped');
+      playPickup();
+      setTimeout(playWhoosh, 300);
+      setTimeout(playPlace, 1600);
+      setTimeout(refreshSoundCheck, 100);
+    });
+    var testSpeak = $('#btn-sc-speak');
+    if (testSpeak) testSpeak.addEventListener('click', function () {
+      speakAloud('Sound check. Announcements are working.');
+      setTimeout(refreshSoundCheck, 100);
+    });
+  }
+
   // -------------------------------------------------------------- session --
   // session = {
   //   mode: 'local' | 'online',
@@ -127,16 +175,59 @@
   var audioCtx = null;
   var speakTimer = null;
 
+  // ------------------------------------------------ audio diagnostics --
+  // A small ring log of what the audio stack actually did — speech
+  // start/finish/error events and sound-engine state changes — shown
+  // in the Sound Check panel. On iPhone this is the evidence that
+  // separates "the announcement never started" from "it started but
+  // came out somewhere inaudible" (earpiece routing, silent switch).
+  var audioLog = [];
+  function alog(msg) {
+    var d = new Date();
+    var ts = ('0' + d.getHours()).slice(-2) + ':' +
+      ('0' + d.getMinutes()).slice(-2) + ':' + ('0' + d.getSeconds()).slice(-2);
+    audioLog.push(ts + ' ' + msg);
+    if (audioLog.length > 40) audioLog.shift();
+    var sc = $('#sound-check');
+    if (sc && !sc.classList.contains('hidden')) refreshSoundCheck();
+  }
+  window.AzulAudioLog = alog;
+
+  var lastCtxState = '';
+  function noteCtxState() {
+    if (!audioCtx) return;
+    if (audioCtx.state !== lastCtxState) {
+      lastCtxState = audioCtx.state;
+      alog('Game sound engine: ' + lastCtxState);
+    }
+  }
+
   function ensureAudio() {
     if (!soundOn) return null;
     if (!audioCtx) {
       var AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
       audioCtx = new AC();
+      audioCtx.onstatechange = noteCtxState;
+      noteCtxState();
     }
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (audioCtx.state === 'suspended' || audioCtx.state === 'interrupted') {
+      try { audioCtx.resume(); } catch (e) { /* ignore */ }
+    }
     return audioCtx;
   }
+
+  // Coming back to the tab can leave the engine suspended/interrupted
+  // on iOS — wake it (the next tap finishes the job if iOS insists on
+  // a gesture).
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) {
+      if (audioCtx && audioCtx.state !== 'running') {
+        try { audioCtx.resume(); } catch (e) { /* ignore */ }
+      }
+      if (window.AzulVoice) window.AzulVoice.unlockAudio();
+    }
+  });
 
   // iOS/Safari keep WebAudio and speech locked until a real user gesture
   // unlocks them; the first sound here is often attempted from a timer or
@@ -279,6 +370,10 @@
             window.speechSynthesis.resume();
             var u = new SpeechSynthesisUtterance(name + '’s turn now');
             u.rate = 1.02;
+            u.onstart = function () { alog('Announcement started: ' + name + '’s turn'); };
+            u.onend = function () { alog('Announcement finished: ' + name + '’s turn'); };
+            u.onerror = function (ev) { alog('Announcement ERROR (' + (ev && ev.error ? ev.error : 'unknown') + '): ' + name + '’s turn'); };
+            alog('Announcement requested: ' + name + '’s turn');
             window.speechSynthesis.speak(u);
             // Belt and braces: un-pause again right after queueing.
             window.speechSynthesis.resume();
@@ -542,8 +637,13 @@
     if (!session.state || session.state.phase !== 'draft') return;
     if (mv.by !== session.state.currentPlayer) return;
     if (remoteReplay || flying) return;
-    // If the state already moved on, the announcement is stale news.
-    if (stateKey(window.AzulEngine.normalize(room.state)) !== stateKey(session.state)) return;
+    // Even when this snapshot already carries the mover's new state
+    // (the state write and the move announcement landed together), the
+    // replay still works: this screen's DOM and session.state are
+    // pre-move until onRoomUpdate applies the snapshot, and that same
+    // call stashes this very room into the replay handleLive starts.
+    // (Skipping here was why observers sometimes got no flight and no
+    // hold — just the board switch, or nothing at all.)
     lastRemoteMoveId = mv.id;
     startRemoteReplay(mv);
   }
@@ -1632,8 +1732,10 @@
       if (ssA.speaking || ssA.pending) ssA.cancel();
       var u = new SpeechSynthesisUtterance(text);
       u.rate = 1.02;
-      u.onend = finish;
-      u.onerror = finish;
+      u.onstart = function () { alog('Speech started: ' + text.slice(0, 40)); };
+      u.onend = function () { alog('Speech finished: ' + text.slice(0, 40)); finish(); };
+      u.onerror = function (ev) { alog('Speech ERROR (' + (ev && ev.error ? ev.error : 'unknown') + '): ' + text.slice(0, 40)); finish(); };
+      alog('Speech requested: ' + text.slice(0, 40));
       // Same iOS cancel-then-speak race as speakTurn: wait a beat first.
       setTimeout(function () {
         try {
@@ -1959,6 +2061,7 @@
     wireGameOver();
     wireVoice();
     wireFullscreen();
+    wireSoundCheck();
 
     // First tap anywhere also unlocks remote voice audio (autoplay rules).
     document.addEventListener('pointerdown', function () {
