@@ -1582,6 +1582,10 @@
     dismissCelebration();
     stopCelebration();
     try { window.sessionStorage.removeItem('azul-session'); } catch (e) { /* ignore */ }
+    // Land on the mode chooser, not on whichever setup screen was used.
+    $('#home-chooser').classList.remove('hidden');
+    $('#setup-local').classList.add('hidden');
+    $('#setup-online').classList.add('hidden');
     show('screen-home');
   }
 
