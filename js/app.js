@@ -1622,7 +1622,32 @@
   }
 
   // ----------------------------------------------------------------- init --
+  // Self-update: if this tab is running an older build than the server
+  // (a long-lived phone tab keeps the HTML it first loaded), reload once
+  // so new versions actually reach the player.
+  function checkForUpdate() {
+    try {
+      var meta = document.querySelector('meta[name="azul-build"]');
+      if (!meta || !window.fetch) return;
+      var mine = parseInt(meta.getAttribute('content'), 10);
+      fetch('version.json', { cache: 'no-store' })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var latest = parseInt(data && data.v, 10);
+          if (!latest || latest <= mine) return;
+          var key = 'azul-reloaded-for';
+          try {
+            if (sessionStorage.getItem(key) === String(latest)) return;
+            sessionStorage.setItem(key, String(latest));
+          } catch (e) { /* ignore */ }
+          window.location.reload();
+        })
+        .catch(function () { /* offline — ignore */ });
+    } catch (e) { /* ignore */ }
+  }
+
   function init() {
+    checkForUpdate();
     wireHome();
     wireLobby();
     wireGame();
