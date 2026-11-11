@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Azul — Tile Game</title>
 <meta name="description" content="Azul tile game — play locally with friends on one device, or online by sharing a room link.">
-<link rel="stylesheet" href="css/styles.css?v=38">
+<link rel="stylesheet" href="css/styles.css?v=39">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%232f6fd0'/><rect x='26' y='26' width='48' height='48' rx='8' transform='rotate(45 50 50)' fill='%23f5f1e6'/></svg>">
 </head>
 <body>
@@ -29,15 +29,15 @@
         <h3>🧩 Your board</h3>
         <ul>
           <li><strong>Pattern lines</strong> (left) — 5 rows that hold 1, 2, 3, 4 and 5 tiles. This is where tiles wait before going on the wall.</li>
-          <li><strong>Wall</strong> (right) — a 5 × 5 grid. Each space only accepts the tile color printed on it.</li>
-          <li><strong>Floor line</strong> (bottom) — where tiles you can't place end up. Every tile there costs you points.</li>
+          <li><strong>Wall</strong> (right) — A 5 × 5 grid. Each space only accepts the tile color printed on it.</li>
+          <li><strong>Floor line</strong> (bottom) — Where tiles you can't place end up. Every tile there costs you points.</li>
         </ul>
 
         <h3>1️⃣ Factory offer — take turns drafting</h3>
         <p>On your turn, take tiles in <strong>one</strong> of these ways:</p>
         <ul>
-          <li><strong>From a factory:</strong> tap any one color in a factory disc to take <em>all</em> tiles of that color. The tiles left behind slide into the center.</li>
-          <li><strong>From the center:</strong> tap a color in the center pile to take all tiles of that color there. The first player to take from the center each round also gets the <strong>“1” starting-player marker</strong> — it sits on your floor line (a −1 penalty) and you will start the next round.</li>
+          <li><strong>From a factory:</strong> Tap any one color in a factory disc to take <em>all</em> tiles of that color. The tiles left behind slide into the center.</li>
+          <li><strong>From the center:</strong> Tap a color in the center pile to take all tiles of that color there. The first player to take from the center each round also gets the <strong>“1” starting-player marker</strong> — it sits on your floor line (a −1 penalty) and you will start the next round.</li>
         </ul>
         <p>Then place the tiles you took onto <strong>one</strong> pattern line:</p>
         <ul>
@@ -50,8 +50,8 @@
         <h3>2️⃣ Wall-tiling — score your completed lines</h3>
         <ul>
           <li>Going top to bottom, each <strong>complete</strong> pattern line moves its rightmost tile onto the space of the same color in that row of your wall, and scores right away. The rest of that line's tiles are discarded.</li>
-          <li><strong>Scoring a tile:</strong> if it touches no other tile, it scores <strong>1 point</strong>. Otherwise count all tiles linked to it horizontally, add all tiles linked vertically (count the new tile in both), and score that total.</li>
-          <li><strong>Floor line:</strong> each tile there costs the points printed above its space: <strong>−1, −1, −2, −2, −2, −3, −3</strong>. The starting marker counts as a floor tile. Your score never goes below 0.</li>
+          <li><strong>Scoring a tile:</strong> If it touches no other tile, it scores <strong>1 point</strong>. Otherwise count all tiles linked to it horizontally, add all tiles linked vertically (count the new tile in both), and score that total.</li>
+          <li><strong>Floor line:</strong> Each tile there costs the points printed above its space: <strong>−1, −1, −2, −2, −2, −3, −3</strong>. The starting marker counts as a floor tile. Your score never goes below 0.</li>
           <li>When the score card appears, tap it to start the next round. The player with the starting marker goes first, and the factories refill — 5 factories for 2 players, 7 for 3, 9 for 4.</li>
         </ul>
 
@@ -66,7 +66,7 @@
         <h3>📱 Playing in this app</h3>
         <ul>
           <li>Tap a tile group to pick it up, then tap a glowing pattern line (or your floor line) to place it. Tap the group again to put it back.</li>
-          <li><strong>Local:</strong> pass-and-play on this device. <strong>Online:</strong> create a room and share the invite link — voice chat is on by default.</li>
+          <li><strong>Local:</strong> Pass-and-play on this device. <strong>Online:</strong> Create a room and share the invite link — voice chat is on by default.</li>
           <li>The 🔊 button in the game turns the sounds and voice announcements on or off.</li>
         </ul>
         <p class="how-note">Rules follow the official Azul rulebook (Plan B Games / Next Move Games).</p>
@@ -218,10 +218,10 @@
 
 <button type="button" id="btn-fullscreen" class="fs-btn hidden" aria-label="Enter full screen">⛶</button>
 
-<script src="js/engine.js?v=38"></script>
+<script src="js/engine.js?v=39"></script>
 <!-- js/config.js is an ES module; js/online.js imports it on demand. -->
-<script src="js/online.js?v=38"></script>
-<script src="js/voice.js?v=38"></script>
-<script src="js/app.js?v=38"></script>
+<script src="js/online.js?v=39"></script>
+<script src="js/voice.js?v=39"></script>
+<script src="js/app.js?v=39"></script>
 </body>
 </html>

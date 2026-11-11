@@ -729,8 +729,8 @@
         ' from ' + from + ' — now tap a highlighted pattern line on ' + cur.name +
         '’s board, or their floor line.';
     } else if (canInteract()) {
-      hint = session.mode === 'online' ? 'Your move: tap a group of tiles to pick them up.'
-                                       : cur.name + ': tap a group of tiles to pick them up.';
+      hint = session.mode === 'online' ? 'Your move: Tap a group of tiles to pick them up.'
+                                       : cur.name + ': Tap a group of tiles to pick them up.';
     }
     $('#selection-hint').textContent = hint;
 
@@ -1209,9 +1209,9 @@
       var muteBtn = box.querySelector('.btn-voice-mute');
       var toggleBtn = box.querySelector('.btn-voice-toggle');
       if (status) {
-        status.textContent = snap.joining ? '· connecting…'
-          : snap.active ? '· on'
-          : snap.blocked ? '· mic blocked' : '· off';
+        status.textContent = snap.joining ? '· Connecting…'
+          : snap.active ? '· On'
+          : snap.blocked ? '· Mic blocked' : '· Off';
       }
       if (members) {
         members.innerHTML = snap.members.length ? snap.members.map(function (m) {
@@ -1219,7 +1219,7 @@
             (m.muted ? ' is-muted' : '') + '">' +
             (m.speaking ? '🔊 ' : '🎙️ ') + esc(m.name) + (m.me ? ' (you)' : '') +
             (m.muted ? ' 🔇' : '') +
-            (!m.me && snap.active && !m.connected ? ' · connecting…' : '') +
+            (!m.me && snap.active && !m.connected ? ' · Connecting…' : '') +
             '</span>';
         }).join('') : '<span class="voice-none">Nobody in voice yet</span>';
       }
