@@ -467,8 +467,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 }
 .board-main { display: flex; gap: 8px; align-items: flex-start; }
 
-.pattern-lines { display: flex; flex-direction: column; gap: 4px; padding-right: 10px; }
-.pline { display: flex; gap: 4px; justify-content: flex-end; align-items: center; min-height: var(--tile); border-radius: 8px; padding: 2px; border: 2px solid transparent; position: relative; }
+.pattern-lines { display: flex; flex-direction: column; gap: 4px; padding-right: 10px; padding-top: 6.5px; }
+.pline { display: flex; gap: 4px; justify-content: flex-end; align-items: center; height: var(--tile); border-radius: 8px; padding: 0 2px; border: none; position: relative; }
 .pline::after {
   content: "";
   position: absolute;
@@ -481,12 +481,11 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
   opacity: .75;
 }
 .pline.droppable {
-  border-color: rgba(47, 111, 208, .55);
   background: rgba(47, 111, 208, .10);
-  box-shadow: 0 0 0 2px rgba(47, 111, 208, .30);
+  box-shadow: inset 0 0 0 2px rgba(47, 111, 208, .55), 0 0 0 2px rgba(47, 111, 208, .30);
   cursor: pointer;
 }
-.pline.droppable:hover { border-color: #2f6fd0; background: rgba(47, 111, 208, .18); }
+.pline.droppable:hover { background: rgba(47, 111, 208, .18); box-shadow: inset 0 0 0 2px #2f6fd0, 0 0 0 2px rgba(47, 111, 208, .30); }
 .pline.blocked { opacity: .45; filter: grayscale(.4); }
 .slot {
   width: var(--tile); height: var(--tile);
@@ -523,19 +522,6 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 .wall-cell.just-placed { animation: pop .5s ease; }
 @keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
 
-/* Hand-shuffle on phones (chip layout): next board rises into place,
-   previous board settles down into its chip. */
-@keyframes shuffleIn {
-  0% { transform: translateY(34vh) scale(.94); opacity: .3; }
-  100% { transform: translateY(0) scale(1); opacity: 1; }
-}
-.board.shuffle-in { position: relative; z-index: 3; animation: shuffleIn .95s cubic-bezier(.3, .7, .3, 1); }
-@keyframes shuffleOut {
-  0% { transform: translateY(-18px); opacity: .35; }
-  100% { transform: translateY(0); opacity: 1; }
-}
-.board.shuffle-out { animation: shuffleOut .7s ease-out; }
-
 .floor-line { margin-top: 10px; }
 .floor-label { font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: #5b6a85; margin-bottom: 3px; }
 .floor-slots { display: flex; gap: 4px; border-radius: 8px; padding: 2px; border: 2px solid transparent; width: 100%; }
@@ -565,30 +551,13 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 .floor-cell .tile { width: min(100%, calc(var(--tile) * 1.25)); height: auto; aspect-ratio: 1 / 1; }
 
 /* Compact opponent boards */
-.board.compact { --tile: calc(var(--tile-size) * .62); padding: 8px; }
+/* Opponent boards render in full, at the same size as the active board,
+   so the whole screen is used. */
 .board.compact .board-name { font-size: .95rem; }
-.board.compact .board-main { gap: 6px; }
 @media (min-width: 769px) {
   .boards { grid-template-columns: 1fr 1fr; }
   .board.turn { grid-column: 1 / -1; }
 }
-/* Phones/tablets portrait: opponent boards collapse to a tappable chip
-   (head only) so the active board owns the screen. Tap toggles .peek-open
-   (state kept in app.js so it survives re-renders). */
-@media (max-width: 768px) {
-  .board.compact:not(.peek-open) .board-main,
-  .board.compact:not(.peek-open) .floor-line { display: none; }
-  .board.compact .board-head { cursor: pointer; margin-bottom: 0; }
-  .board.compact.peek-open .board-head { margin-bottom: 10px; }
-  .board.compact .board-head::after {
-    content: "▾";
-    color: #175d6e;
-    font-weight: 800;
-    margin-left: 8px;
-  }
-  .board.compact.peek-open .board-head::after { content: "▴"; }
-}
-
 .selection-hint { min-height: 1.3em; color: #8fc1f5; font-weight: 600; font-size: .94rem; margin: 8px 2px 2px; }
 /* Sticky bottom action bar — rides above the phone's safe area and never
    covers the boards (sticky, so it takes its own space in the flow). */

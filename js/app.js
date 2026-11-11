@@ -95,7 +95,6 @@
   var lastAnnouncedRound = null; // round-end pause/dictation handled up to this round
   var finalAnnouncedKey = null;  // score signature of the last announced game-over
   var roundOverlayTimer = null;
-  var peekBoards = {}; // playerIdx -> true: collapsed opponent board expanded (mobile)
 
   // ---------------------------------------------------------- sound & voice --
   var soundOn = true;
@@ -649,36 +648,12 @@
     // into place — like the boards are being shuffled by hand (~1s).
     var turnKey = s.round + ':' + s.currentPlayer + ':' + s.phase;
     var turnChanged = lastTurnKey !== null && turnKey !== lastTurnKey && s.phase === 'draft';
-    var prevPlayer = null;
-    if (lastTurnKey) {
-      var keyParts = lastTurnKey.split(':');
-      if (keyParts.length === 3) prevPlayer = parseInt(keyParts[1], 10);
-    }
     lastTurnKey = turnKey;
     if (turnChanged) {
       var bannerEl = $('#turn-banner');
       bannerEl.classList.add('pulse');
       bannerEl.scrollIntoView({ block: 'start' });
       if (!REDUCED_MOTION) {
-        // On phones the other boards are collapsed chips, so a rect-based
-        // FLIP would squash the incoming board from chip height — instead
-        // play the hand-shuffle directly: the next board rises up into
-        // place while the previous board settles down into its chip.
-        var chipMode = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-        if (chipMode) {
-          var inBoard = boardsEl.querySelector('.board.turn');
-          if (inBoard) {
-            inBoard.classList.add('shuffle-in', 'turn-enter');
-            setTimeout(function () { inBoard.classList.remove('shuffle-in'); }, 1000);
-          }
-          if (prevPlayer !== null && prevPlayer !== s.currentPlayer) {
-            var outBoard = boardsEl.querySelector('.board[data-player="' + prevPlayer + '"]');
-            if (outBoard) {
-              outBoard.classList.add('shuffle-out');
-              setTimeout(function () { outBoard.classList.remove('shuffle-out'); }, 750);
-            }
-          }
-        } else {
         boardsEl.querySelectorAll('.board').forEach(function (b) {
           var old = prevRects[b.dataset.player];
           if (!old || !b.animate) return;
@@ -697,7 +672,6 @@
         });
         var topBoard = $('#boards .board.turn');
         if (topBoard) topBoard.classList.add('turn-enter');
-        }
       }
       playPlace();
       if (!justEndedRound) speakTurn(cur.name); // round-end dictation takes over
@@ -763,7 +737,7 @@
     }
 
     return '<div class="board' + (isTurnBoard ? ' turn' : ' compact') +
-      (!isTurnBoard && peekBoards[pi] ? ' peek-open' : '') + '" data-player="' + pi + '">' +
+      '" data-player="' + pi + '">' +
       '<div class="board-head"><span class="board-name">' + esc(p.name) + youTag + '</span>' +
       '<span class="board-right">' + roundChip +
       '<span class="board-score">★ ' + p.score + '</span></span></div>' +
@@ -777,18 +751,6 @@
 
   function wireGame() {
     $('#round-overlay').addEventListener('click', dismissRoundOverlay);
-
-    // Mobile: collapsed opponent boards expand/collapse when their head is
-    // tapped. State lives in peekBoards so it survives re-renders.
-    $('#boards').addEventListener('click', function (ev) {
-      var head = ev.target.closest('.board-head');
-      if (!head) return;
-      var board = head.closest('.board');
-      if (!board || board.classList.contains('turn')) return;
-      var pi = board.dataset.player;
-      peekBoards[pi] = !peekBoards[pi];
-      board.classList.toggle('peek-open', !!peekBoards[pi]);
-    });
 
     $('#screen-game').addEventListener('click', function (ev) {
       if (!session || !session.state) return;
