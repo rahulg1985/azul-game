@@ -525,31 +525,31 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 
 .floor-line { margin-top: 10px; }
 .floor-label { font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: #5b6a85; margin-bottom: 3px; }
-.floor-slots { display: flex; gap: 4px; border-radius: 8px; padding: 2px; border: 2px solid transparent; }
+.floor-slots { display: flex; gap: 4px; border-radius: 8px; padding: 2px; border: 2px solid transparent; width: 100%; }
 .floor-slots.droppable { border-color: rgba(47, 111, 208, .55); background: rgba(47, 111, 208, .10); cursor: pointer; }
 .floor-slots.droppable:hover { border-color: #2f6fd0; }
 .floor-slot {
-  width: var(--tile); text-align: center; flex: none;
+  flex: 1 1 0; min-width: 0; text-align: center;
   background: rgba(255, 255, 255, .35);
   border: 1.5px solid #a08c5f;
   border-radius: 13px 13px 6px 6px;
   padding: 1.5px 1.5px 3px;
 }
 .floor-pen {
-  font-size: .68rem; font-weight: 800; color: #ffe9a8;
-  height: 15px; line-height: 15px;
+  font-size: .8rem; font-weight: 800; color: #ffe9a8;
+  height: 18px; line-height: 18px;
   background: #175d6e;
   border-radius: 10px 10px 3px 3px;
   margin-bottom: 2px;
 }
 .floor-cell {
-  width: 100%; height: var(--tile);
+  width: 100%; min-height: var(--tile);
   border-radius: 6px;
   border: 1.5px dashed #b3a077;
   background: rgba(255, 255, 255, .45);
   display: flex; align-items: center; justify-content: center;
 }
-.floor-cell .tile { width: calc(var(--tile) - 3px); height: calc(var(--tile) - 3px); }
+.floor-cell .tile { width: min(100%, calc(var(--tile) * 1.25)); height: auto; aspect-ratio: 1 / 1; }
 
 /* Compact opponent boards */
 .board.compact { --tile: calc(var(--tile-size) * .62); padding: 8px; }
