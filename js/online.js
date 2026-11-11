@@ -153,7 +153,10 @@
     var room = snap.val();
     var players = room.players || [];
     var saved = storedSeat(code);
-    if (saved && players[saved.playerIdx] === saved.name) {
+    // Reclaim a stored seat only when it belongs to the name just entered —
+    // a different name means a different player who happens to share this
+    // browser (e.g. a second tab), and they must join as a new seat.
+    if (saved && saved.name === name && players[saved.playerIdx] === saved.name) {
       return { code: code, playerIdx: saved.playerIdx };
     }
     var byName = players.indexOf(name);
