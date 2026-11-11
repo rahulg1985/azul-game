@@ -964,30 +964,56 @@
       });
       var startSwitch = function () {
         playWhoosh();
+        // FLIP, done the Safari-safe way: first pin every board at its
+        // pre-switch spot with an inline transform and force a reflow
+        // so that displaced state is the board's committed style, THEN
+        // create the arc animation on the next frame. Creating a WAAPI
+        // animation in the same frame as the innerHTML rebuild (or in
+        // the same frame an inline transform is cleared) lets iOS
+        // Safari silently drop it — the boards just snapped into place
+        // on iPhone while Android animated fine. The flying tiles never
+        // hit this because they are born displaced via left/top and
+        // animated with fill:'forwards'.
         switchBoards.forEach(function (it) {
+          it.b.style.transform = 'translate(' + it.dx + 'px, ' + it.dy + 'px)';
           it.b.style.zIndex = it.isIn ? 3 : 2;
-          var keyframes;
-          if (it.isIn || it.isOut) {
-            // Swing out in opposite arcs with a slight tilt, like the
-            // two boards are mounted on a revolving wheel.
-            var arc = it.isIn ? -26 : 26;
-            var tilt = it.isIn ? -1.4 : 1.4;
-            keyframes = [
-              { transform: 'translate(' + it.dx + 'px, ' + it.dy + 'px) rotate(0deg)' },
-              { transform: 'translate(' + (it.dx * 0.5 + arc) + 'px, ' + (it.dy * 0.5) + 'px) rotate(' + tilt + 'deg) scale(.985)', offset: 0.5 },
-              { transform: 'translate(0px, 0px) rotate(0deg) scale(1)' }
-            ];
-          } else {
-            keyframes = [
-              { transform: 'translate(' + it.dx + 'px, ' + it.dy + 'px)' },
-              { transform: 'translate(0px, 0px)' }
-            ];
-          }
-          var anim = it.b.animate(keyframes, { duration: 1000, easing: 'cubic-bezier(.4, .05, .3, 1)' });
-          anim.onfinish = function () { it.b.style.zIndex = ''; };
         });
-        var topBoard = $('#boards .board.turn');
-        if (topBoard) topBoard.classList.add('turn-enter');
+        void boardsEl.offsetWidth; // commit the displaced state
+        requestAnimationFrame(function () {
+          switchBoards.forEach(function (it) {
+            var keyframes;
+            if (it.isIn || it.isOut) {
+              // Swing out in opposite arcs with a slight tilt, like the
+              // two boards are mounted on a revolving wheel.
+              var arc = it.isIn ? -26 : 26;
+              var tilt = it.isIn ? -1.4 : 1.4;
+              keyframes = [
+                { transform: 'translate(' + it.dx + 'px, ' + it.dy + 'px) rotate(0deg)' },
+                { transform: 'translate(' + (it.dx * 0.5 + arc) + 'px, ' + (it.dy * 0.5) + 'px) rotate(' + tilt + 'deg) scale(.985)', offset: 0.5 },
+                { transform: 'translate(0px, 0px) rotate(0deg) scale(1)' }
+              ];
+            } else {
+              keyframes = [
+                { transform: 'translate(' + it.dx + 'px, ' + it.dy + 'px)' },
+                { transform: 'translate(0px, 0px)' }
+              ];
+            }
+            var b = it.b;
+            var done = function () { b.style.transform = ''; b.style.zIndex = ''; };
+            var anim = null;
+            try {
+              anim = b.animate(keyframes, { duration: 1000, easing: 'cubic-bezier(.4, .05, .3, 1)', fill: 'both' });
+            } catch (e) { anim = null; }
+            if (anim) {
+              anim.onfinish = done;
+              setTimeout(done, 1200); // safety net if onfinish is swallowed
+            } else {
+              done();
+            }
+          });
+          var topBoard = $('#boards .board.turn');
+          if (topBoard) topBoard.classList.add('turn-enter');
+        });
       };
       if (holdNextSwitch && !justEndedRound) {
         // The tiles just flew in and took their positions (this render
@@ -1011,7 +1037,8 @@
           if (holdSeq !== switchHoldSeq) return;
           bannerEl.innerHTML = heldBannerHTML;
           hintEl.textContent = heldHint;
-          switchBoards.forEach(function (it) { it.b.style.transform = ''; });
+          // Boards stay pinned at their old spots (inline transforms
+          // set above) — startSwitch takes it from there.
           startSwitch();
           speakTurn(cur.name);
         }, 1000);

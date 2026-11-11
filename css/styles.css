@@ -858,15 +858,11 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
   .factories { gap: 6px; }
 }
 
-/* ----------------------------------------------------- reduced motion --- */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: .01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: .01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
+/* NOTE: no prefers-reduced-motion squash block here on purpose. The
+   turn switch, tile flights, glow and banner pulse are features the
+   user explicitly asked for; an OS Reduce Motion setting silently
+   killing them was the root cause of repeated "not working on my
+   phone" reports (his iPhone has Reduce Motion ON). */
 
 /* Tiles in flight between the factory/center and the chosen row. */
 .fly-tile {
