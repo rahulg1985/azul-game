@@ -523,6 +523,19 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 .wall-cell.just-placed { animation: pop .5s ease; }
 @keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
 
+/* Hand-shuffle on phones (chip layout): next board rises into place,
+   previous board settles down into its chip. */
+@keyframes shuffleIn {
+  0% { transform: translateY(34vh) scale(.94); opacity: .3; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+.board.shuffle-in { position: relative; z-index: 3; animation: shuffleIn .95s cubic-bezier(.3, .7, .3, 1); }
+@keyframes shuffleOut {
+  0% { transform: translateY(-18px); opacity: .35; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.board.shuffle-out { animation: shuffleOut .7s ease-out; }
+
 .floor-line { margin-top: 10px; }
 .floor-label { font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: #5b6a85; margin-bottom: 3px; }
 .floor-slots { display: flex; gap: 4px; border-radius: 8px; padding: 2px; border: 2px solid transparent; width: 100%; }

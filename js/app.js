@@ -649,12 +649,36 @@
     // into place — like the boards are being shuffled by hand (~1s).
     var turnKey = s.round + ':' + s.currentPlayer + ':' + s.phase;
     var turnChanged = lastTurnKey !== null && turnKey !== lastTurnKey && s.phase === 'draft';
+    var prevPlayer = null;
+    if (lastTurnKey) {
+      var keyParts = lastTurnKey.split(':');
+      if (keyParts.length === 3) prevPlayer = parseInt(keyParts[1], 10);
+    }
     lastTurnKey = turnKey;
     if (turnChanged) {
       var bannerEl = $('#turn-banner');
       bannerEl.classList.add('pulse');
       bannerEl.scrollIntoView({ block: 'start' });
       if (!REDUCED_MOTION) {
+        // On phones the other boards are collapsed chips, so a rect-based
+        // FLIP would squash the incoming board from chip height — instead
+        // play the hand-shuffle directly: the next board rises up into
+        // place while the previous board settles down into its chip.
+        var chipMode = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+        if (chipMode) {
+          var inBoard = boardsEl.querySelector('.board.turn');
+          if (inBoard) {
+            inBoard.classList.add('shuffle-in', 'turn-enter');
+            setTimeout(function () { inBoard.classList.remove('shuffle-in'); }, 1000);
+          }
+          if (prevPlayer !== null && prevPlayer !== s.currentPlayer) {
+            var outBoard = boardsEl.querySelector('.board[data-player="' + prevPlayer + '"]');
+            if (outBoard) {
+              outBoard.classList.add('shuffle-out');
+              setTimeout(function () { outBoard.classList.remove('shuffle-out'); }, 750);
+            }
+          }
+        } else {
         boardsEl.querySelectorAll('.board').forEach(function (b) {
           var old = prevRects[b.dataset.player];
           if (!old || !b.animate) return;
@@ -673,6 +697,7 @@
         });
         var topBoard = $('#boards .board.turn');
         if (topBoard) topBoard.classList.add('turn-enter');
+        }
       }
       playPlace();
       if (!justEndedRound) speakTurn(cur.name); // round-end dictation takes over
