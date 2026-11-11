@@ -321,6 +321,11 @@
     if (chooser) chooser.classList.toggle('hidden', !!which);
     if (local) local.classList.toggle('hidden', which !== 'local');
     if (online) online.classList.toggle('hidden', which !== 'online');
+    // While a setup form is open, hide the logo header entirely and put
+    // the form at the very top — otherwise the phone keyboard pushes the
+    // name fields around and they have to be scrolled into view by hand.
+    document.body.classList.toggle('config-open', !!which);
+    if (which) window.scrollTo(0, 0);
   }
 
   function wireHome() {
@@ -1609,6 +1614,7 @@
     stopCelebration();
     try { window.sessionStorage.removeItem('azul-session'); } catch (e) { /* ignore */ }
     // Land on the mode chooser, not on whichever setup screen was used.
+    document.body.classList.remove('config-open');
     $('#home-chooser').classList.remove('hidden');
     $('#setup-local').classList.add('hidden');
     $('#setup-online').classList.add('hidden');

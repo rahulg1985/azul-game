@@ -103,6 +103,7 @@ main {
 
 /* During gameplay the AZUL plaque gives its space back to the game. */
 body.in-game .app-header { display: none; }
+body.config-open .app-header { display: none; }
 body.in-game main { padding-top: 6px; }
 
 .hidden { display: none !important; }
