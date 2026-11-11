@@ -991,7 +991,9 @@
     document.querySelectorAll('#screen-game .tile-group.selected').forEach(function (g) {
       g.querySelectorAll('.tile').forEach(function (t) { tiles.push(t); });
     });
-    if (REDUCED_MOTION || !tiles.length || !targetEl || !tiles[0].animate) {
+    // NOTE: no reduced-motion skip here — the flight is a requested
+    // feature; the OS setting silently killed it on the user's phone.
+    if (!tiles.length || !targetEl || !tiles[0].animate) {
       attemptMove(dest);
       return;
     }
