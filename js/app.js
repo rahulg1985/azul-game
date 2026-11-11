@@ -145,6 +145,14 @@
   var speechPrimed = false;
   function unlockAudio() {
     if (soundOn) ensureAudio();
+    if ('speechSynthesis' in window) {
+      // iOS can leave the speech queue paused after a backgrounding or
+      // an interrupted utterance; a paused queue swallows every later
+      // announcement silently, so un-pause it on every tap.
+      try {
+        if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+      } catch (e) { /* ignore */ }
+    }
     if (!speechPrimed && ('speechSynthesis' in window)) {
       speechPrimed = true;
       try {
@@ -260,7 +268,10 @@
     if (speakTimer) clearTimeout(speakTimer);
     speakTimer = setTimeout(function () {
       try {
-        window.speechSynthesis.cancel();
+        var ss = window.speechSynthesis;
+        // Only cancel when something is actually queued — an idle
+        // cancel() is what makes iOS drop the utterance that follows.
+        if (ss.speaking || ss.pending) ss.cancel();
         // iOS drops an utterance spoken in the same tick as a cancel() —
         // give it a beat, and resume() in case the queue was left paused.
         setTimeout(function () {
@@ -269,6 +280,8 @@
             var u = new SpeechSynthesisUtterance(name + '’s turn now');
             u.rate = 1.02;
             window.speechSynthesis.speak(u);
+            // Belt and braces: un-pause again right after queueing.
+            window.speechSynthesis.resume();
           } catch (e) { /* ignore */ }
         }, 60);
       } catch (e) { /* ignore */ }
@@ -1433,18 +1446,25 @@
     renderVoice();
   }
 
+  // WhatsApp-style call icons (inline SVG, stroke style, 24x24).
+  var ICON_MIC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3" fill="currentColor" stroke="none"></rect><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"></path><path d="M12 18v3.5"></path></svg>';
+  var ICON_MIC_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3" fill="currentColor" stroke="none"></rect><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"></path><path d="M12 18v3.5"></path><line x1="3.5" y1="3.5" x2="20.5" y2="20.5"></line></svg>';
+  var ICON_SPK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" fill="currentColor" stroke="none"></path><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5"></path><path d="M18 7a7 7 0 0 1 0 10"></path></svg>';
+  var ICON_SPK_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" fill="currentColor" stroke="none"></path><line x1="16" y1="9.5" x2="21.5" y2="15"></line><line x1="21.5" y1="9.5" x2="16" y2="15"></line></svg>';
+  var ICON_CALL = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24 11.4 11.4 0 0 0 3.57.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1.02l-2.2 2.2z"></path></svg>';
+  var ICON_HANGUP = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><g transform="rotate(135 12 12)"><path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24 11.4 11.4 0 0 0 3.57.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1.02l-2.2 2.2z"></path></g></svg>';
+
   function renderVoice() {
     var V = window.AzulVoice;
     var snap = V ? V.snapshot()
-      : { active: false, joining: false, blocked: false, muted: false, members: [] };
+      : { active: false, joining: false, blocked: false, muted: false, speakerOn: true, hasMic: false, members: [] };
     var inOnline = !!(session && session.mode === 'online');
     document.querySelectorAll('.voice-box').forEach(function (box) {
       box.classList.toggle('hidden', !inOnline);
       if (!inOnline) return;
       var status = box.querySelector('.voice-status');
       var members = box.querySelector('.voice-members');
-      var muteBtn = box.querySelector('.btn-voice-mute');
-      var toggleBtn = box.querySelector('.btn-voice-toggle');
+      var controls = box.querySelector('.voice-controls');
       if (status) {
         status.textContent = snap.joining ? '· Connecting…'
           : snap.blocked ? '· Mic blocked'
@@ -1463,12 +1483,34 @@
             '</span>';
         }).join('') : '<span class="voice-none">No one in voice yet</span>';
       }
-      if (muteBtn) {
-        muteBtn.disabled = !snap.hasMic;
-        muteBtn.textContent = snap.muted ? '🔊 Unmute' : '🔇 Mute';
-      }
-      if (toggleBtn) {
-        toggleBtn.textContent = (snap.joining || (snap.active && snap.hasMic)) ? 'Leave Voice' : 'Enable Voice';
+      if (controls) {
+        // WhatsApp-style call bar: one Enable button while voice is
+        // off; once on, a round button per feature — mic on/off,
+        // speaker on/off, and a red hang-up to leave voice.
+        if (snap.joining) {
+          controls.innerHTML =
+            '<button type="button" class="vbtn vbtn-enable" disabled>' +
+            ICON_CALL + '<span>Connecting…</span></button>';
+        } else if (!snap.active || !snap.hasMic) {
+          controls.innerHTML =
+            '<button type="button" class="vbtn vbtn-enable btn-voice-toggle" aria-label="Enable voice chat">' +
+            ICON_CALL + '<span>Enable Voice Chat</span></button>' +
+            (snap.active
+              ? '<button type="button" class="vbtn vbtn-leave btn-voice-leave" aria-label="Leave voice chat">' + ICON_HANGUP + '</button>'
+              : '');
+        } else {
+          controls.innerHTML =
+            '<button type="button" class="vbtn btn-voice-mute' + (snap.muted ? ' off' : '') +
+            '" aria-label="' + (snap.muted ? 'Unmute microphone' : 'Mute microphone') +
+            '" title="' + (snap.muted ? 'Unmute' : 'Mute') + '">' +
+            (snap.muted ? ICON_MIC_OFF : ICON_MIC) + '</button>' +
+            '<button type="button" class="vbtn btn-voice-speaker' + (snap.speakerOn === false ? ' off' : '') +
+            '" aria-label="' + (snap.speakerOn === false ? 'Turn speaker on' : 'Turn speaker off') +
+            '" title="' + (snap.speakerOn === false ? 'Speaker off' : 'Speaker on') + '">' +
+            (snap.speakerOn === false ? ICON_SPK_OFF : ICON_SPK) + '</button>' +
+            '<button type="button" class="vbtn vbtn-leave btn-voice-leave" aria-label="Leave voice chat" title="Leave voice">' +
+            ICON_HANGUP + '</button>';
+        }
       }
     });
   }
@@ -1477,26 +1519,35 @@
     if (window.AzulVoice) {
       window.AzulVoice.setCallbacks({ onChange: function () { renderVoice(); } });
     }
-    document.querySelectorAll('.btn-voice-mute').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var V = window.AzulVoice;
-        if (V) V.setMuted(!V.snapshot().muted);
-      });
-    });
-    document.querySelectorAll('.btn-voice-toggle').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var V = window.AzulVoice;
-        if (!V || !session || session.mode !== 'online') return;
-        if (V.isActive() && V.snapshot().hasMic) {
-          voiceOptOut = true;
-          V.leave();
-        } else {
-          voiceOptOut = false;
-          V.join(session.code, session.playerIdx, session.myName)
-            .catch(function (err) { toast(err.message || 'Microphone unavailable', true); });
-        }
+    // Delegated: renderVoice() rebuilds the call-bar buttons per state,
+    // so the handlers live on the document, not on the buttons.
+    document.addEventListener('click', function (ev) {
+      var V = window.AzulVoice;
+      if (!V || !ev.target.closest) return;
+      if (ev.target.closest('.btn-voice-mute')) {
+        V.setMuted(!V.snapshot().muted);
+        return;
+      }
+      if (ev.target.closest('.btn-voice-speaker')) {
+        V.setSpeaker(!V.snapshot().speakerOn);
+        return;
+      }
+      if (ev.target.closest('.btn-voice-leave')) {
+        voiceOptOut = true;
+        V.leave();
         renderVoice();
-      });
+        return;
+      }
+      if (ev.target.closest('.btn-voice-toggle')) {
+        if (!session || session.mode !== 'online') return;
+        voiceOptOut = false;
+        // This click is a user gesture — wake the playback context now,
+        // before the async mic prompt, so remote audio can play.
+        V.unlockAudio();
+        V.join(session.code, session.playerIdx, session.myName)
+          .catch(function (err) { toast(err.message || 'Microphone unavailable', true); });
+        renderVoice();
+      }
     });
   }
 
@@ -1516,7 +1567,8 @@
     }
     try {
       if (speakTimer) { clearTimeout(speakTimer); speakTimer = null; }
-      window.speechSynthesis.cancel();
+      var ssA = window.speechSynthesis;
+      if (ssA.speaking || ssA.pending) ssA.cancel();
       var u = new SpeechSynthesisUtterance(text);
       u.rate = 1.02;
       u.onend = finish;

@@ -5,7 +5,7 @@
  * 2–4 players in a room (full mesh); Firebase only carries the signaling
  * (offers/answers/ICE) and voice presence, under:
  *
- *   rooms/{code}/voice/members/{playerIdx} = { name, muted, ts }
+ *   rooms/{code}/voice/members/{playerIdx} = { name, muted, mic, ts }
  *   rooms/{code}/voice/signals/{toIdx}/{pushId} = { from, kind, data }
  *
  * The lower player index always initiates the peer connection, which
@@ -13,6 +13,15 @@
  * ICE uses Google's public STUN servers; there is no TURN relay, so a
  * small minority of very strict networks may not connect audio (the
  * game itself is unaffected).
+ *
+ * Playback: remote audio is routed through ONE shared WebAudio context
+ * (MediaStreamSource -> GainNode -> destination). On iOS, a plain
+ * <audio> element carrying WebRTC audio is routed to the quiet earpiece
+ * receiver while the mic is live; WebAudio output goes to the loud
+ * speaker, which is what players expect. The <audio> element is kept
+ * per peer as a fallback sink for browsers where the WebAudio route is
+ * unavailable, and the speaker toggle drives the gain (or the element's
+ * muted flag on the fallback path).
  */
 (function () {
   'use strict';
@@ -36,9 +45,13 @@
     myName: '',
     stream: null,
     muted: false,
-    members: {},   // idx -> { name, muted, ts }
+    speakerOn: true,
+    ctx: null,     // shared AudioContext for playback + speaking meters
+    members: {},   // idx -> { name, muted, mic, ts }
     pcs: {},       // idx -> RTCPeerConnection
-    audioEls: {},  // idx -> <audio>
+    audioEls: {},  // idx -> <audio> (fallback sink)
+    nodes: {},     // idx -> { source, gain } WebAudio playback route
+    routed: {},    // idx -> true when the WebAudio route carries the audio
     iceQueue: {},  // idx -> [candidate] waiting for a remote description
     analysers: {}, // idx|'me' -> { ctx, node }
     speaking: {},  // idx|'me' -> true
@@ -55,6 +68,19 @@
   function db() { return window.firebase.database(); }
   function vRef(path) { return db().ref('rooms/' + S.code + '/voice/' + path); }
   function now() { return Date.now(); }
+
+  // One shared AudioContext for every voice stream. Created lazily —
+  // before the first user gesture it starts out suspended and the app's
+  // pointerdown unlock (unlockAudio) resumes it.
+  function actx() {
+    if (S.ctx) return S.ctx;
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      S.ctx = new AC();
+    } catch (e) { S.ctx = null; }
+    return S.ctx;
+  }
 
   function snapshot() {
     var members = Object.keys(S.members).map(function (k) {
@@ -86,6 +112,7 @@
       blocked: S.blocked,
       hasMic: !!S.stream,
       muted: S.muted,
+      speakerOn: S.speakerOn,
       members: members
     };
   }
@@ -207,6 +234,20 @@
       if (ev.streams && ev.streams[0]) attachAudio(idx, ev.streams[0]);
     };
     pc.onconnectionstatechange = function () {
+      if (pc.connectionState === 'disconnected' && S.active && S.myIdx < idx) {
+        // Transient network wobble (common when a phone switches
+        // Wi-Fi/cellular): ask ICE to re-negotiate instead of dropping.
+        setTimeout(function () {
+          if (S.pcs[idx] !== pc || pc.connectionState !== 'disconnected' || !S.active) return;
+          try {
+            if (pc.restartIce) pc.restartIce();
+            pc.createOffer({ iceRestart: true })
+              .then(function (offer) { return pc.setLocalDescription(offer); })
+              .then(function () { send(idx, 'offer', pc.localDescription.toJSON()); })
+              .catch(function () { /* ignore */ });
+          } catch (e) { /* ignore */ }
+        }, 2500);
+      }
       if (pc.connectionState === 'failed') {
         closePeer(idx);
         // The initiator retries while the peer is still in voice.
@@ -237,21 +278,72 @@
   }
 
   // ---------------------------------------------------------------- audio --
+  function playEl(el) {
+    try {
+      var p = el.play();
+      if (p && p.catch) p.catch(function () { /* retried on next tap / timer */ });
+    } catch (e) { /* ignore */ }
+  }
+
   function attachAudio(idx, stream) {
     detachAudio(idx);
+    // Fallback sink. Kept rendered (1px, transparent) rather than
+    // display:none — some mobile browsers refuse to play hidden media.
     var el = document.createElement('audio');
     el.autoplay = true;
     el.setAttribute('playsinline', '');
     el.srcObject = stream;
-    el.style.display = 'none';
+    el.style.cssText = 'position:fixed;left:0;bottom:0;width:2px;height:2px;' +
+      'opacity:.01;pointer-events:none;z-index:-1;';
     document.body.appendChild(el);
     S.audioEls[idx] = el;
-    var p = el.play();
-    if (p && p.catch) p.catch(function () { /* unlocked by unlockAudio() on next tap */ });
-    watchSpeaking(idx, stream);
+
+    // Primary route: WebAudio -> loud speaker (see file header).
+    var routed = false;
+    try {
+      var ctx = actx();
+      if (ctx) {
+        var source = ctx.createMediaStreamSource(stream);
+        var gain = ctx.createGain();
+        gain.gain.value = S.speakerOn ? 1 : 0;
+        source.connect(gain);
+        gain.connect(ctx.destination);
+        var an = ctx.createAnalyser();
+        an.fftSize = 256;
+        source.connect(an);
+        S.nodes[idx] = { source: source, gain: gain };
+        S.analysers[idx] = { ctx: ctx, node: an };
+        if (!S.speakTimer) S.speakTimer = setInterval(pollSpeaking, 220);
+        routed = true;
+      }
+    } catch (e) { routed = false; }
+    S.routed[idx] = routed;
+
+    // When the WebAudio route carries the sound, the element stays
+    // muted (it just keeps the stream warm); otherwise the element IS
+    // the speaker and obeys the speaker toggle.
+    el.muted = routed ? true : !S.speakerOn;
+    el.volume = 1;
+    playEl(el);
+    // Autoplay policies can hold element playback until the user taps;
+    // retry a few times so the fallback path recovers on its own.
+    [600, 1500, 3000].forEach(function (d) {
+      setTimeout(function () {
+        if (S.audioEls[idx] === el && el.paused) playEl(el);
+        var c = S.ctx;
+        if (c && c.state === 'suspended') { /* resumes on next tap */ }
+      }, d);
+    });
   }
 
   function detachAudio(idx) {
+    var n = S.nodes[idx];
+    if (n) {
+      try { n.source.disconnect(); } catch (e) { /* ignore */ }
+      try { n.gain.disconnect(); } catch (e) { /* ignore */ }
+      delete S.nodes[idx];
+    }
+    delete S.routed[idx];
     var el = S.audioEls[idx];
     if (el) { try { el.srcObject = null; el.remove(); } catch (e) { /* ignore */ } }
     delete S.audioEls[idx];
@@ -260,23 +352,43 @@
 
   // Autoplay policies can hold remote audio until the user taps; the app
   // calls this on pointerdown so the first move tap also unlocks sound.
+  // It also resumes the shared playback context — the call runs inside
+  // the tap, which is exactly the gesture iOS requires.
   function unlockAudio() {
+    var ctx = actx();
+    if (ctx && ctx.state === 'suspended') {
+      try { var rp = ctx.resume(); if (rp && rp.catch) rp.catch(function () {}); } catch (e) { /* ignore */ }
+    }
     Object.keys(S.audioEls).forEach(function (k) {
       var el = S.audioEls[k];
-      if (el && el.paused) { var p = el.play(); if (p && p.catch) p.catch(function () {}); }
+      if (el && el.paused) playEl(el);
     });
-    Object.keys(S.analysers).forEach(function (k) {
-      var a = S.analysers[k];
-      if (a && a.ctx.state === 'suspended') a.ctx.resume();
+  }
+
+  // Speaker on/off: silences (or restores) everyone's voice on THIS
+  // device only — the mic keeps sending. Drives the WebAudio gain on
+  // the primary route and the element mute on the fallback route.
+  function setSpeaker(on) {
+    S.speakerOn = !!on;
+    Object.keys(S.nodes).forEach(function (k) {
+      var n = S.nodes[k];
+      if (n && n.gain) {
+        try { n.gain.gain.value = S.speakerOn ? 1 : 0; } catch (e) { /* ignore */ }
+      }
     });
+    Object.keys(S.audioEls).forEach(function (k) {
+      var el = S.audioEls[k];
+      if (el) el.muted = S.routed[k] ? true : !S.speakerOn;
+    });
+    emit();
   }
 
   // ------------------------------------------------------------- speaking --
   function watchSpeaking(key, stream) {
+    // Local mic meter only — remote meters are wired in attachAudio.
     try {
-      var AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return;
-      var ctx = new AC();
+      var ctx = actx();
+      if (!ctx) return;
       var node = ctx.createAnalyser();
       node.fftSize = 256;
       ctx.createMediaStreamSource(stream).connect(node);
@@ -288,8 +400,6 @@
   }
 
   function unwatchSpeaking(key) {
-    var a = S.analysers[key];
-    if (a) { try { a.ctx.close(); } catch (e) { /* ignore */ } }
     delete S.analysers[key];
     if (S.speaking[key]) { delete S.speaking[key]; emit(); }
   }
@@ -320,6 +430,7 @@
     var seq = ++S.joinSeq;
     S.joining = true;
     S.blocked = false;
+    actx(); // create the playback context as early as possible
     emit();
     try {
       if (!resumeMicOnly) {
@@ -375,6 +486,7 @@
     }
     S.stream = stream;
     S.blocked = false;
+    unlockAudio(); // mic grant counts as engagement — wake playback up
     watchSpeaking('me', stream);
     vRef('members/' + S.myIdx).update({
       mic: true, ts: window.firebase.database.ServerValue.TIMESTAMP
@@ -391,6 +503,7 @@
     if (S.signalsRef && S.signalsHandler) S.signalsRef.off('child_added', S.signalsHandler);
     Object.keys(S.pcs).forEach(function (k) { closePeer(parseInt(k, 10)); });
     Object.keys(S.audioEls).forEach(function (k) { detachAudio(parseInt(k, 10)); });
+    Object.keys(S.nodes).forEach(function (k) { detachAudio(parseInt(k, 10)); });
     unwatchSpeaking('me');
     if (S.stream) {
       S.stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) { /* ignore */ } });
@@ -436,6 +549,7 @@
     join: join,
     leave: leave,
     setMuted: setMuted,
+    setSpeaker: setSpeaker,
     updateIdentity: updateIdentity,
     unlockAudio: unlockAudio,
     isActive: function () { return S.active; },

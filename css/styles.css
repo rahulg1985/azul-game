@@ -675,9 +675,28 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 .voice-chip.speaking { border-color: #43d17c; box-shadow: 0 0 10px rgba(67, 209, 124, .45); }
 .voice-chip.is-muted { opacity: .55; }
 .voice-none { color: var(--ink-dim); font-size: .88rem; padding: 3px 0; white-space: nowrap; }
-.voice-controls { display: flex; gap: 8px; }
-.voice-controls .btn { padding: 6px 12px; font-size: .88rem; }
-.voice-controls .btn:disabled { opacity: .45; cursor: not-allowed; }
+.voice-controls { display: flex; gap: 12px; align-items: center; margin-left: auto; }
+/* WhatsApp-style call buttons: one round button per feature, icon shows
+   the state, red background when a feature is off. */
+.vbtn {
+  width: 46px; height: 46px; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .22);
+  background: rgba(255, 255, 255, .13); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; padding: 0; flex: 0 0 auto;
+  -webkit-tap-highlight-color: transparent;
+}
+.vbtn svg { width: 24px; height: 24px; display: block; }
+.vbtn:active { transform: scale(.93); }
+.vbtn.off { background: #d93025; border-color: #d93025; color: #fff; }
+.vbtn-leave { background: #d93025; border-color: #d93025; color: #fff; }
+.vbtn-enable {
+  width: auto; height: 46px; border-radius: 999px; padding: 0 18px;
+  gap: 9px; background: #1fae55; border-color: #1fae55; color: #fff;
+  font-weight: 700; font-size: .92rem; font-family: inherit;
+}
+.vbtn-enable svg { width: 21px; height: 21px; }
+.vbtn:disabled { opacity: .5; cursor: default; }
 .voice-note { margin: 0; color: var(--ink-dim); font-size: .8rem; flex-basis: 100%; }
 
 /* ---------------------------------------------------------- round pause */
