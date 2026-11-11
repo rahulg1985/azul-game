@@ -358,6 +358,13 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 .board-name { font-weight: 800; font-size: 1.05rem; }
 .board-name .you { color: #2f6fd0; font-size: .8rem; font-weight: 700; }
 .board-score { font-weight: 800; color: #1d4e89; }
+.board-right { display: flex; align-items: center; gap: 8px; }
+.round-chip {
+  font-size: .72rem; font-weight: 800; white-space: nowrap;
+  color: #175d6e; background: rgba(23, 93, 110, .10);
+  border: 1.5px solid rgba(23, 93, 110, .45);
+  padding: 2px 8px; border-radius: 999px;
+}
 .board-main { display: flex; gap: 14px; align-items: flex-start; }
 
 .pattern-lines { display: flex; flex-direction: column; gap: 4px; padding-right: 13px; }

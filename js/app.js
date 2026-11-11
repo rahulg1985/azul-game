@@ -579,9 +579,19 @@
     var youTag = session.mode === 'online' && pi === session.playerIdx
       ? ' <span class="you">(you)</span>' : '';
 
+    var resolve = s.lastResolve && s.lastResolve[pi];
+    var roundChip = '';
+    if (resolve) {
+      var net = resolve.gained + resolve.penalty;
+      roundChip = '<span class="round-chip" title="Last wall-tiling: +' + resolve.gained +
+        ' from the wall' + (resolve.penalty ? ', ' + resolve.penalty + ' floor penalties' : '') +
+        '">' + (net >= 0 ? '+' : '') + net + ' last round</span>';
+    }
+
     return '<div class="board' + (isTurnBoard ? ' turn' : ' compact') + '" data-player="' + pi + '">' +
       '<div class="board-head"><span class="board-name">' + esc(p.name) + youTag + '</span>' +
-      '<span class="board-score">★ ' + p.score + '</span></div>' +
+      '<span class="board-right">' + roundChip +
+      '<span class="board-score">★ ' + p.score + '</span></span></div>' +
       '<div class="board-main"><div class="pattern-lines">' + lines + '</div>' +
       '<div class="wall">' + wall + '</div></div>' +
       '<div class="floor-line"><div class="floor-label">Floor line (penalties)</div>' +
