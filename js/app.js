@@ -1258,8 +1258,10 @@
       var toggleBtn = box.querySelector('.btn-voice-toggle');
       if (status) {
         status.textContent = snap.joining ? '· Connecting…'
-          : snap.active ? '· On'
-          : snap.blocked ? '· Mic blocked' : '· Off';
+          : snap.blocked ? '· Mic blocked'
+          : snap.active && snap.hasMic ? '· On'
+          : snap.active ? '· Connecting…'
+          : '· Off';
       }
       if (members) {
         members.innerHTML = snap.members.length ? snap.members.map(function (m) {
@@ -1267,16 +1269,17 @@
             (m.muted ? ' is-muted' : '') + '">' +
             (m.speaking ? '🔊 ' : '🎙️ ') + esc(m.name) + (m.me ? ' (you)' : '') +
             (m.muted ? ' 🔇' : '') +
-            (!m.me && snap.active && !m.connected ? ' · Connecting…' : '') +
+            (!m.mic ? ' · Mic blocked' : '') +
+            (!m.me && snap.active && m.mic && !m.connected ? ' · Connecting…' : '') +
             '</span>';
         }).join('') : '<span class="voice-none">No one in voice yet</span>';
       }
       if (muteBtn) {
-        muteBtn.disabled = !snap.active;
+        muteBtn.disabled = !snap.hasMic;
         muteBtn.textContent = snap.muted ? '🔊 Unmute' : '🔇 Mute';
       }
       if (toggleBtn) {
-        toggleBtn.textContent = (snap.active || snap.joining) ? 'Leave Voice' : 'Enable Voice';
+        toggleBtn.textContent = (snap.joining || (snap.active && snap.hasMic)) ? 'Leave Voice' : 'Enable Voice';
       }
     });
   }
@@ -1295,7 +1298,7 @@
       b.addEventListener('click', function () {
         var V = window.AzulVoice;
         if (!V || !session || session.mode !== 'online') return;
-        if (V.isActive()) {
+        if (V.isActive() && V.snapshot().hasMic) {
           voiceOptOut = true;
           V.leave();
         } else {

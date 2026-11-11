@@ -29,6 +29,7 @@
   var S = {
     active: false,
     joining: false,
+    joinSeq: 0,
     blocked: false, // mic permission denied / unavailable on last attempt
     code: null,
     myIdx: -1,
@@ -63,6 +64,7 @@
         idx: idx,
         name: S.members[k].name,
         muted: !!S.members[k].muted,
+        mic: S.members[k].mic !== false,
         speaking: !!S.speaking[idx],
         connected: !!pc && pc.connectionState === 'connected',
         me: idx === S.myIdx
@@ -72,7 +74,7 @@
       var haveMe = members.some(function (m) { return m.me; });
       if (!haveMe) {
         members.push({
-          idx: S.myIdx, name: S.myName, muted: S.muted,
+          idx: S.myIdx, name: S.myName, muted: S.muted, mic: !!S.stream,
           speaking: !!S.speaking.me, connected: true, me: true
         });
         members.sort(function (a, b) { return a.idx - b.idx; });
@@ -82,6 +84,7 @@
       active: S.active,
       joining: S.joining,
       blocked: S.blocked,
+      hasMic: !!S.stream,
       muted: S.muted,
       members: members
     };
@@ -99,6 +102,7 @@
     if (!S.active) return;
     vRef('members/' + S.myIdx).update({
       muted: S.muted,
+      mic: !!S.stream,
       ts: window.firebase.database.ServerValue.TIMESTAMP
     }).catch(function () { /* ignore */ });
   }
@@ -114,11 +118,7 @@
       });
       S.members = fresh;
       // Connect to / disconnect from peers as membership changes.
-      Object.keys(fresh).forEach(function (k) {
-        var idx = parseInt(k, 10);
-        if (idx === S.myIdx || S.pcs[idx]) return;
-        if (S.myIdx < idx) startPeer(idx, true); // lower index initiates
-      });
+      connectToEligiblePeers();
       Object.keys(S.pcs).forEach(function (k) {
         if (!fresh[k]) closePeer(parseInt(k, 10));
       });
@@ -175,6 +175,20 @@
     return Promise.all(q.map(function (c) {
       return pc.addIceCandidate(new RTCIceCandidate(c)).catch(function () {});
     }));
+  }
+
+  // Connect only when both sides can actually do audio: I need my mic
+  // stream, and the peer's presence must not say mic:false (a member who
+  // joined without a mic flips to mic:true when their mic lands, which
+  // re-fires the members listener and connects us then).
+  function connectToEligiblePeers() {
+    if (!S.stream) return;
+    Object.keys(S.members).forEach(function (k) {
+      var idx = parseInt(k, 10);
+      if (idx === S.myIdx || S.pcs[idx]) return;
+      if (S.members[k].mic === false) return;
+      if (S.myIdx < idx) startPeer(idx, true); // lower index initiates
+    });
   }
 
   // ---------------------------------------------------------------- peers --
@@ -297,47 +311,80 @@
 
   // -------------------------------------------------------------- lifecycle --
   async function join(code, myIdx, myName) {
-    if (S.active && S.code === code && S.myIdx === myIdx) return;
+    if (S.active && S.code === code && S.myIdx === myIdx && S.stream) return;
     if (S.joining) return;
-    if (S.active) leave();
+    // Already present in this room but mic-less (blocked earlier): a fresh
+    // call just retries the microphone, keeping the existing presence.
+    var resumeMicOnly = S.active && S.code === code && S.myIdx === myIdx;
+    if (S.active && !resumeMicOnly) leave();
+    var seq = ++S.joinSeq;
     S.joining = true;
     S.blocked = false;
     emit();
     try {
-      var ready = await window.AzulOnline.init();
-      if (!ready || !window.firebase) throw new Error('Voice is unavailable right now.');
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('This browser cannot share a microphone here.');
+      if (!resumeMicOnly) {
+        var ready = false;
+        try { ready = await window.AzulOnline.init(); } catch (e) { ready = false; }
+        if (seq !== S.joinSeq) return;
+        if (!ready || !window.firebase) throw new Error('Voice is unavailable right now.');
+        S.code = code; S.myIdx = myIdx; S.myName = myName;
+        S.active = true;
+        var myRef = vRef('members/' + myIdx);
+        await myRef.set({
+          name: myName, muted: S.muted, mic: false,
+          ts: window.firebase.database.ServerValue.TIMESTAMP
+        });
+        if (seq !== S.joinSeq) return;
+        myRef.onDisconnect().remove();
+        vRef('signals/' + myIdx).onDisconnect().remove();
+        S.hbTimer = setInterval(heartbeat, 20000);
+        listenMembers();
+        listenSignals();
       }
-      var stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-      });
-      S.code = code; S.myIdx = myIdx; S.myName = myName;
-      S.stream = stream;
-      S.active = true;
       S.joining = false;
-      var myRef = vRef('members/' + myIdx);
-      await myRef.set({
-        name: myName, muted: S.muted,
-        ts: window.firebase.database.ServerValue.TIMESTAMP
-      });
-      myRef.onDisconnect().remove();
-      vRef('signals/' + myIdx).onDisconnect().remove();
-      S.hbTimer = setInterval(heartbeat, 20000);
-      watchSpeaking('me', stream);
-      listenMembers();
-      listenSignals();
       emit();
+      await acquireMic(seq);
     } catch (err) {
+      if (seq !== S.joinSeq) return;
       S.joining = false;
-      S.active = false;
-      S.blocked = true;
+      if (!S.active) S.blocked = true;
       emit();
       throw err;
     }
   }
 
+  async function acquireMic(seq) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      S.blocked = true;
+      emit();
+      throw new Error('This browser cannot share a microphone here.');
+    }
+    var stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      });
+    } catch (err) {
+      if (seq === S.joinSeq) { S.blocked = true; emit(); }
+      throw err;
+    }
+    if (seq !== S.joinSeq) {
+      // Left the room while the mic prompt was up — drop the stream.
+      stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) { /* ignore */ } });
+      return;
+    }
+    S.stream = stream;
+    S.blocked = false;
+    watchSpeaking('me', stream);
+    vRef('members/' + S.myIdx).update({
+      mic: true, ts: window.firebase.database.ServerValue.TIMESTAMP
+    }).catch(function () { /* ignore */ });
+    connectToEligiblePeers();
+    emit();
+  }
+
   function leave() {
+    S.joinSeq++;
     if (S.hbTimer) { clearInterval(S.hbTimer); S.hbTimer = null; }
     if (S.speakTimer) { clearInterval(S.speakTimer); S.speakTimer = null; }
     if (S.membersRef && S.membersHandler) S.membersRef.off('value', S.membersHandler);
