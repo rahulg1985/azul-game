@@ -411,6 +411,66 @@
     return state;
   }
 
+  // ------------------------------------------------------------ normalize --
+  // Firebase RTDB prunes empty arrays/objects and returns sparse arrays as
+  // objects with numeric keys. normalize() repairs a state that survived a
+  // JSON/RTDB round-trip so every field the engine and UI rely on is a real
+  // array again. Safe on an already-clean state (returns it rebuilt).
+  function asArray(value, fill) {
+    var out = [];
+    if (Array.isArray(value)) {
+      for (var i = 0; i < value.length; i++) out.push(value[i] === undefined ? fill : value[i]);
+    } else if (value && typeof value === 'object') {
+      var keys = Object.keys(value);
+      for (var k = 0; k < keys.length; k++) {
+        var idx = Number(keys[k]);
+        if (Number.isInteger(idx) && idx >= 0) out[idx] = value[keys[k]];
+      }
+      for (var j = 0; j < out.length; j++) if (out[j] === undefined) out[j] = fill;
+    }
+    return out;
+  }
+
+  function normalize(state) {
+    if (!state || typeof state !== 'object') return state;
+    state.bag = asArray(state.bag, null).filter(function (t) { return t != null; });
+    state.lid = asArray(state.lid, null).filter(function (t) { return t != null; });
+    state.center = asArray(state.center, null).filter(function (t) { return t != null; });
+    state.players = asArray(state.players, null).filter(Boolean).map(function (p) {
+      var lines = asArray(p.patternLines, []);
+      var patternLines = [];
+      for (var i = 0; i < 5; i++) {
+        patternLines.push(asArray(lines[i], null).filter(function (t) { return t != null; }));
+      }
+      var wallRows = asArray(p.wall, []);
+      var wall = [];
+      for (var r = 0; r < 5; r++) {
+        var row = asArray(wallRows[r], false);
+        var cells = [];
+        for (var c = 0; c < 5; c++) cells.push(!!row[c]);
+        wall.push(cells);
+      }
+      return {
+        name: p.name,
+        score: p.score || 0,
+        patternLines: patternLines,
+        wall: wall,
+        floor: asArray(p.floor, null).filter(function (t) { return t != null; })
+      };
+    });
+    // Factories: when every factory is empty, RTDB prunes the whole list —
+    // rebuild it to the count the player count dictates.
+    state.factories = asArray(state.factories, []).map(function (f) {
+      return asArray(f, null).filter(function (t) { return t != null; });
+    });
+    var wantFactories = FACTORY_COUNT[state.players.length] || 0;
+    while (state.factories.length < wantFactories) state.factories.push([]);
+    if (state.winners) {
+      state.winners = asArray(state.winners, null).filter(function (t) { return t != null; });
+    }
+    return state;
+  }
+
   // -------------------------------------------------------------- exports ---
   var AzulEngine = {
     COLORS: COLORS,
@@ -422,6 +482,7 @@
     wallColor: wallColor,
     wallColumnFor: wallColumnFor,
     createGame: createGame,
+    normalize: normalize,
     legalMoves: legalMoves,
     isLineLegal: isLineLegal,
     applyDraft: applyDraft,

@@ -220,6 +220,9 @@
       }
       try {
         // `current` is a fresh JSON copy owned by the SDK — safe to mutate.
+        // RTDB prunes empty arrays, so repair the shape before the engine
+        // (and the UI) ever see it.
+        current = window.AzulEngine.normalize(current);
         return window.AzulEngine.applyDraft(current, playerIdx, move);
       } catch (e) {
         error = e.message;

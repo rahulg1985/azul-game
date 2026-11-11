@@ -212,21 +212,22 @@
     }
 
     var prev = session.state;
-    session.state = room.state;
+    // RTDB round-trips prune empty arrays — repair before rendering.
+    session.state = window.AzulEngine.normalize(room.state);
 
-    if (!prev || prev.round !== room.state.round || room.state.phase === 'finished') {
-      if (room.state.lastResolve) setHighlightFromResolve(room.state);
+    if (!prev || prev.round !== session.state.round || session.state.phase === 'finished') {
+      if (session.state.lastResolve) setHighlightFromResolve(session.state);
     }
-    if (room.state.phase === 'finished') {
+    if (session.state.phase === 'finished') {
       renderGameOver();
       show('screen-gameover');
       return;
     }
-    if (selection && room.state.currentPlayer !== session.playerIdx) selection = null;
+    if (selection && session.state.currentPlayer !== session.playerIdx) selection = null;
     show('screen-game');
     renderGame();
     if (prev && prev.currentPlayer !== session.playerIdx &&
-        room.state.currentPlayer === session.playerIdx) {
+        session.state.currentPlayer === session.playerIdx) {
       toast('Your turn, ' + session.myName + '!');
     }
   }
