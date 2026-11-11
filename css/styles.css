@@ -287,7 +287,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
   border: 1px solid #3f74b8;
   border-radius: 10px;
   padding: 4px 10px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   box-shadow: 0 8px 22px rgba(0, 0, 0, .5);
 }
 .turn-banner .turn-main { font-size: .98rem; font-weight: 800; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -310,9 +310,10 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 }
 
 /* ----------------------------------------------------------------- table */
-.table-area { padding: 6px; }
+.table-area { padding: 3px 6px 2px; }
 .table-title {
-  margin: 0 0 3px;
+  margin: 0 0 2px;
+  line-height: 1.1;
   font-size: .78rem;
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -582,7 +583,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
   .boards { grid-template-columns: 1fr 1fr; }
   .board.turn { grid-column: 1 / -1; }
 }
-.selection-hint { min-height: 1.3em; color: #8fc1f5; font-weight: 600; font-size: .92rem; margin: 5px 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.selection-hint { min-height: 1.3em; color: #8fc1f5; font-weight: 600; font-size: .92rem; margin: 3px 2px 0; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Sticky bottom action bar — rides above the phone's safe area and never
    covers the boards (sticky, so it takes its own space in the flow). */
 .game-actions {
