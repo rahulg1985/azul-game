@@ -90,6 +90,8 @@
   var session = null;
   var selection = null; // { source: {kind, index?}, color }
   var flying = false; // tile flight animation in progress (input locked)
+  var holdNextSwitch = false; // pause 1s after a flight lands, before the switch
+  var switchHoldSeq = 0; // invalidates a stale held switch after re-renders
   var highlight = {};   // "playerIdx:row:col" -> true for just-tiled cells
   var lastTurnKey = null; // "round:currentPlayer" — drives the turn-change animation
   var voiceOptOut = false; // user tapped "Leave voice" in this room session
@@ -669,6 +671,7 @@
     var s = session.state;
     if (!s) return;
     stopCelebration();
+    var prevBannerHTML = $('#turn-banner').innerHTML;
     var cur = s.players[s.currentPlayer];
 
     // --- banner ---
@@ -792,7 +795,8 @@
       var bannerEl = $('#turn-banner');
       bannerEl.classList.add('pulse');
       bannerEl.scrollIntoView({ block: 'start' });
-      playWhoosh();
+      // Collect every board that has to travel to its new slot.
+      var switchBoards = [];
       boardsEl.querySelectorAll('.board').forEach(function (b) {
         var old = prevRects[b.dataset.player];
         if (!old || !b.animate) return;
@@ -800,33 +804,71 @@
         var dx = old.left - (nr.left + window.scrollX);
         var dy = old.top - (nr.top + window.scrollY);
         if (!dx && !dy) return;
-        var isIn = b.classList.contains('turn');
-        var isOut = prevPlayer !== null && parseInt(b.dataset.player, 10) === prevPlayer;
-        b.style.zIndex = isIn ? 3 : 2;
-        var keyframes;
-        if (isIn || isOut) {
-          // Swing out in opposite arcs with a slight tilt, like the two
-          // boards are mounted on a revolving wheel passing each other.
-          var arc = isIn ? -26 : 26;
-          var tilt = isIn ? -1.4 : 1.4;
-          keyframes = [
-            { transform: 'translate(' + dx + 'px, ' + dy + 'px) rotate(0deg)' },
-            { transform: 'translate(' + (dx * 0.5 + arc) + 'px, ' + (dy * 0.5) + 'px) rotate(' + tilt + 'deg) scale(.985)', offset: 0.5 },
-            { transform: 'translate(0px, 0px) rotate(0deg) scale(1)' }
-          ];
-        } else {
-          keyframes = [
-            { transform: 'translate(' + dx + 'px, ' + dy + 'px)' },
-            { transform: 'translate(0px, 0px)' }
-          ];
-        }
-        var anim = b.animate(keyframes, { duration: 1000, easing: 'cubic-bezier(.4, .05, .3, 1)' });
-        anim.onfinish = function () { b.style.zIndex = ''; };
+        switchBoards.push({
+          b: b, dx: dx, dy: dy,
+          isIn: b.classList.contains('turn'),
+          isOut: prevPlayer !== null && parseInt(b.dataset.player, 10) === prevPlayer
+        });
       });
-      var topBoard = $('#boards .board.turn');
-      if (topBoard) topBoard.classList.add('turn-enter');
-      playPlace();
-      if (!justEndedRound) speakTurn(cur.name); // round-end dictation takes over
+      var startSwitch = function () {
+        playWhoosh();
+        switchBoards.forEach(function (it) {
+          it.b.style.zIndex = it.isIn ? 3 : 2;
+          var keyframes;
+          if (it.isIn || it.isOut) {
+            // Swing out in opposite arcs with a slight tilt, like the
+            // two boards are mounted on a revolving wheel.
+            var arc = it.isIn ? -26 : 26;
+            var tilt = it.isIn ? -1.4 : 1.4;
+            keyframes = [
+              { transform: 'translate(' + it.dx + 'px, ' + it.dy + 'px) rotate(0deg)' },
+              { transform: 'translate(' + (it.dx * 0.5 + arc) + 'px, ' + (it.dy * 0.5) + 'px) rotate(' + tilt + 'deg) scale(.985)', offset: 0.5 },
+              { transform: 'translate(0px, 0px) rotate(0deg) scale(1)' }
+            ];
+          } else {
+            keyframes = [
+              { transform: 'translate(' + it.dx + 'px, ' + it.dy + 'px)' },
+              { transform: 'translate(0px, 0px)' }
+            ];
+          }
+          var anim = it.b.animate(keyframes, { duration: 1000, easing: 'cubic-bezier(.4, .05, .3, 1)' });
+          anim.onfinish = function () { it.b.style.zIndex = ''; };
+        });
+        var topBoard = $('#boards .board.turn');
+        if (topBoard) topBoard.classList.add('turn-enter');
+      };
+      if (holdNextSwitch && !justEndedRound) {
+        // The tiles just flew in and took their positions (this render
+        // already applied the move and cleared the selection). Hold the
+        // boards in the old arrangement for a full second so everyone
+        // can take in the play, THEN switch the turn.
+        holdNextSwitch = false;
+        playPlace();
+        var holdSeq = ++switchHoldSeq;
+        var heldBannerHTML = bannerEl.innerHTML;
+        bannerEl.innerHTML = prevBannerHTML;
+        switchBoards.forEach(function (it) {
+          it.b.style.transform = 'translate(' + it.dx + 'px, ' + it.dy + 'px)';
+          it.b.style.zIndex = it.isIn ? 3 : 2;
+        });
+        setTimeout(function () {
+          flying = false;
+          if (holdSeq !== switchHoldSeq) return;
+          bannerEl.innerHTML = heldBannerHTML;
+          switchBoards.forEach(function (it) { it.b.style.transform = ''; });
+          startSwitch();
+          speakTurn(cur.name);
+        }, 1000);
+      } else {
+        holdNextSwitch = false;
+        flying = false;
+        startSwitch();
+        playPlace();
+        if (!justEndedRound) speakTurn(cur.name); // round-end dictation takes over
+      }
+    } else if (holdNextSwitch) {
+      holdNextSwitch = false;
+      flying = false;
     }
     renderVoice();
   }
@@ -982,9 +1024,10 @@
   }
 
   // Fly the selected tiles in a slow circular arc — down and to the
-  // right — into the exact slots they will occupy, with a whoosh. They
-  // rest there for a full second so everyone can see what was played,
-  // and only then does the move apply and the boards switch.
+  // right — into the exact slots they will occupy, with a whoosh. The
+  // moment they land the move applies (tiles take their real positions,
+  // selection clears), then the turn switch pauses a full second so
+  // everyone can take in what was played.
   function flyAndMove(dest, targetEl) {
     if (flying || !selection) return;
     var tiles = [];
@@ -1062,12 +1105,13 @@
         duration: FLIGHT_MS, delay: i * 90, easing: 'ease-in-out', fill: 'forwards'
       });
     });
-    // Land -> rest 1s with the tiles sitting in the row -> move applies.
+    // Land -> the move applies at once (tiles take their real positions,
+    // selection clears) -> renderGame holds the turn switch for 1s.
     setTimeout(function () {
       clones.forEach(function (c) { c.remove(); });
-      flying = false;
+      holdNextSwitch = true;
       attemptMove(dest);
-    }, FLIGHT_MS + (tiles.length - 1) * 90 + 1000);
+    }, FLIGHT_MS + (tiles.length - 1) * 90);
   }
 
   function attemptMove(dest) {
@@ -1079,6 +1123,8 @@
       try {
         E.applyDraft(s, s.currentPlayer, move);
       } catch (err) {
+        flying = false;
+        holdNextSwitch = false;
         toast(err.message, true);
         return;
       }
@@ -1101,7 +1147,11 @@
           }
         }
       })
-      .catch(function (err) { toast(err.message, true); });
+      .catch(function (err) {
+        flying = false;
+        holdNextSwitch = false;
+        toast(err.message, true);
+      });
   }
 
   function afterLocalMove(prevRound) {
@@ -1387,6 +1437,8 @@
     var s = session.state;
     if (!s || s.phase !== 'finished' || celebrating) return;
     celebrating = true;
+    flying = false;
+    holdNextSwitch = false;
     selection = null;
     show('screen-game');
     $('#screen-game').classList.add('game-over-mode');
