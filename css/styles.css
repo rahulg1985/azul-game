@@ -560,10 +560,9 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
   padding: 1.5px 1.5px 3px;
 }
 .floor-pen {
-  font-size: .8rem; font-weight: 800; color: #ffe9a8;
+  font-size: .8rem; font-weight: 800; color: #161616;
   height: 18px; line-height: 18px;
-  background: #175d6e;
-  border-radius: 10px 10px 3px 3px;
+  background: none;
   margin-bottom: 2px;
 }
 .floor-cell {
