@@ -431,16 +431,19 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 
 .marker-token {
   width: var(--tile); height: var(--tile);
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #ffe9a8, var(--gold));
-  color: #fff;
+  border-radius: 22%;
+  /* The starting-player tile from the original game: cream ceramic with
+     a cobalt ornate frame (assets/marker.svg); the "1" is the text. */
+  background: #f6f0dd url('../assets/marker.svg') center / 100% 100% no-repeat;
+  color: #1e3591;
   font-weight: 900;
-  font-size: .78rem;
+  font-size: 1.05rem;
+  font-family: Georgia, 'Times New Roman', serif;
   display: inline-flex; align-items: center; justify-content: center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, .5), inset 0 0 0 2px rgba(255, 255, 255, .55);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .5), inset 0 0 0 1px rgba(120, 105, 70, .35), inset 0 -3px 5px rgba(120, 105, 70, .18);
   flex: none;
 }
-.marker-token.inline { width: calc(var(--tile) - 2px); height: calc(var(--tile) - 2px); font-size: .58rem; vertical-align: middle; }
+.marker-token.inline { width: calc(var(--tile) - 2px); height: calc(var(--tile) - 2px); font-size: .95rem; vertical-align: middle; }
 
 /* ---------------------------------------------------------------- boards */
 .boards { display: grid; grid-template-columns: 1fr; gap: var(--board-gap); }

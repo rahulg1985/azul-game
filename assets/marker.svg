@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fffdf6"/>
+      <stop offset="1" stop-color="#ece4cf"/>
+    </linearGradient>
+  </defs>
+  <rect x="2.5" y="2.5" width="95" height="95" rx="15" fill="url(#g)"/>
+  <rect x="2.5" y="2.5" width="95" height="95" rx="15" fill="none" stroke="#d9d0ba" stroke-width="1.5"/>
+  <path d="M50 12.5 C59 12.5 65 15 73.5 17.3 C83 19.8 86.8 25.5 88 35 C89.2 44.5 89.2 55.5 88 65 C86.8 74.5 83 80.2 73.5 82.7 C65 85 59 87.5 50 87.5 C41 87.5 35 85 26.5 82.7 C17 80.2 13.2 74.5 12 65 C10.8 55.5 10.8 44.5 12 35 C13.2 25.5 17 19.8 26.5 17.3 C35 15 41 12.5 50 12.5 Z" fill="none" stroke="#1e3591" stroke-width="4.6" stroke-linejoin="round"/>
+  <g id="cnr" stroke="#1e3591" fill="#1e3591">
+    <path d="M15.5 4.4 Q7.2 5.4 4.9 12.6" fill="none" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="22" cy="4.4" r="1.9" stroke="none"/>
+    <circle cx="4.4" cy="22" r="1.9" stroke="none"/>
+  </g>
+  <use href="#cnr"/>
+  <use href="#cnr" transform="rotate(90 50 50)"/>
+  <use href="#cnr" transform="rotate(180 50 50)"/>
+  <use href="#cnr" transform="rotate(270 50 50)"/>
+</svg>

@@ -728,7 +728,7 @@
     // --- center ---
     var centerHtml = '';
     if (s.centerHasMarker) {
-      centerHtml += '<span class="marker-token" title="Starting player marker — first to take from the center gets it (and a −1 floor penalty)">1st</span>';
+      centerHtml += '<span class="marker-token" title="Starting player marker — first to take from the center gets it (and a −1 floor penalty)">1</span>';
     }
     centerHtml += groupsHtml(s.center, { kind: 'center' }, true);
     if (!centerHtml) centerHtml = '<span class="center-empty">The center is empty.</span>';
@@ -932,7 +932,7 @@
     for (var k = 0; k < E.FLOOR_SIZE; k++) {
       var cell = '';
       var entry = p.floor[k];
-      if (entry === E.FIRST) cell = '<span class="marker-token inline">1st</span>';
+      if (entry === E.FIRST) cell = '<span class="marker-token inline">1</span>';
       else if (entry) cell = tileHtml(entry);
       floorSlots += '<span class="floor-slot"><span class="floor-pen">' +
         E.FLOOR_PENALTIES[k] + '</span><span class="floor-cell">' + cell + '</span></span>';
