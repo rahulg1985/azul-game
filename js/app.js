@@ -205,7 +205,7 @@
           } catch (e) { /* ignore */ }
         }, 60);
       } catch (e) { /* ignore */ }
-    }, 1500);
+    }, 1100);
   }
 
   function setSound(on) {
@@ -712,51 +712,38 @@
       return boardHtml(s, pi);
     }).join('');
 
-    // Turn changed? Hand-shuffle the two boards involved: the previous
-    // player's board slowly sinks down to its new slot while the next
-    // player's board slowly rises up into the top slot — a long, even,
-    // pure-vertical glide (no scaling, so nothing squashes), like the
-    // boards are being shuffled by hand. Other boards stay put.
+    // Turn changed? FLIP-animate every board from its old spot to its new
+    // one: the old board glides down, the next player's board glides up
+    // into place — like the boards are being shuffled by hand (~1s).
     var turnKey = s.round + ':' + s.currentPlayer + ':' + s.phase;
     var turnChanged = lastTurnKey !== null && turnKey !== lastTurnKey && s.phase === 'draft';
-    var prevPlayer = null;
-    if (lastTurnKey) {
-      var keyParts = lastTurnKey.split(':');
-      if (keyParts.length === 3) prevPlayer = parseInt(keyParts[1], 10);
-    }
     lastTurnKey = turnKey;
     if (turnChanged) {
       var bannerEl = $('#turn-banner');
       bannerEl.classList.add('pulse');
-      try {
-        bannerEl.scrollIntoView({ block: 'start', behavior: 'smooth' });
-      } catch (e) {
-        bannerEl.scrollIntoView({ block: 'start' });
-      }
-      // Sounds first, so an animation hiccup can never eat them.
-      playPlace();
-      if (!justEndedRound) speakTurn(cur.name); // round-end dictation takes over
+      bannerEl.scrollIntoView({ block: 'start' });
       if (!REDUCED_MOTION) {
-        var inBoard = boardsEl.querySelector('.board.turn');
-        var outBoard = prevPlayer !== null && prevPlayer !== s.currentPlayer
-          ? boardsEl.querySelector('.board[data-player="' + prevPlayer + '"]') : null;
-        [inBoard, outBoard].forEach(function (b) {
-          if (!b || !b.animate) return;
+        boardsEl.querySelectorAll('.board').forEach(function (b) {
           var old = prevRects[b.dataset.player];
-          if (!old) return;
+          if (!old || !b.animate) return;
           var nr = b.getBoundingClientRect();
           var dx = old.left - (nr.left + window.scrollX);
           var dy = old.top - (nr.top + window.scrollY);
-          if (!dx && !dy) return;
+          var sx = old.width / nr.width;
+          var sy = old.height / nr.height;
+          if (!dx && !dy && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) return;
           b.style.zIndex = b.classList.contains('turn') ? 3 : 2;
           var anim = b.animate([
-            { transform: 'translate(' + dx + 'px, ' + dy + 'px)' },
-            { transform: 'translate(0px, 0px)' }
-          ], { duration: 1600, easing: 'cubic-bezier(.4, .1, .3, 1)' });
+            { transform: 'translate(' + dx + 'px, ' + dy + 'px) scale(' + sx + ', ' + sy + ')' },
+            { transform: 'translate(0px, 0px) scale(1, 1)' }
+          ], { duration: 1000, easing: 'cubic-bezier(.3, .7, .3, 1)' });
           anim.onfinish = function () { b.style.zIndex = ''; };
         });
-        if (inBoard) inBoard.classList.add('turn-enter');
+        var topBoard = $('#boards .board.turn');
+        if (topBoard) topBoard.classList.add('turn-enter');
       }
+      playPlace();
+      if (!justEndedRound) speakTurn(cur.name); // round-end dictation takes over
     }
     renderVoice();
   }
