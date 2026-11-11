@@ -491,3 +491,33 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
   text-align: center;
 }
 .toast.error { background: #a93226; border-color: #d1604f; }
+
+/* ----------------------------------------------------------------- voice */
+.voice-box {
+  margin: 14px auto 16px;
+  max-width: 560px;
+  background: linear-gradient(170deg, #1a2947, var(--card) 60%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .4);
+}
+#screen-game .voice-box { max-width: none; }
+.voice-head { font-weight: 800; font-size: .98rem; }
+.voice-status { color: var(--accent-2); font-weight: 700; font-size: .85rem; }
+.voice-members { display: flex; flex-wrap: wrap; gap: 6px; margin: 9px 0; min-height: 26px; }
+.voice-chip {
+  background: rgba(255, 255, 255, .10);
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: .85rem;
+  font-weight: 600;
+}
+.voice-chip.speaking { border-color: #43d17c; box-shadow: 0 0 10px rgba(67, 209, 124, .45); }
+.voice-chip.is-muted { opacity: .55; }
+.voice-none { color: var(--ink-dim); font-size: .88rem; padding: 3px 0; }
+.voice-controls { display: flex; gap: 8px; }
+.voice-controls .btn { padding: 8px 14px; font-size: .92rem; }
+.voice-controls .btn:disabled { opacity: .45; cursor: not-allowed; }
+.voice-note { margin: 8px 0 0; color: var(--ink-dim); font-size: .8rem; }

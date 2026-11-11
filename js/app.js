@@ -42,6 +42,7 @@
   var selection = null; // { source: {kind, index?}, color }
   var highlight = {};   // "playerIdx:row:col" -> true for just-tiled cells
   var lastTurnKey = null; // "round:currentPlayer" — drives the turn-change animation
+  var voiceOptOut = false; // user tapped "Leave voice" in this room session
 
   // ---------------------------------------------------------- sound & voice --
   var soundOn = true;
@@ -254,9 +255,12 @@
     highlight = {};
     session.unwatch = window.AzulOnline.watchRoom(code, onRoomUpdate);
     show('screen-lobby');
+    voiceOptOut = false;
+    startVoiceAuto(); // voice chat is on by default in online rooms
   }
 
   function leaveRoomWatch() {
+    if (window.AzulVoice) window.AzulVoice.leave();
     if (session && session.unwatch) {
       session.unwatch();
       session.unwatch = null;
@@ -279,6 +283,7 @@
       if (idx !== -1) {
         session.playerIdx = idx;
         window.AzulOnline.saveSeat(session.code, session.myName, idx);
+        if (window.AzulVoice) window.AzulVoice.updateIdentity(idx);
       }
     }
 
@@ -337,6 +342,7 @@
       startBtn.classList.add('hidden');
       $('#lobby-status').textContent = 'Waiting for the host to start the game…';
     }
+    renderVoice();
   }
 
   function wireLobby() {
@@ -529,6 +535,7 @@
       playPlace();
       speakTurn(cur.name);
     }
+    renderVoice();
   }
 
   function boardHtml(s, pi) {
@@ -718,6 +725,87 @@
     renderGame();
   }
 
+  // --------------------------------------------------------------- voice --
+  // Voice chat is ON by default in online rooms: entering a room joins
+  // voice automatically (the browser asks for mic permission the first
+  // time). "Leave voice" opts out for the rest of that room session.
+  function startVoiceAuto() {
+    var V = window.AzulVoice;
+    if (!V || !session || session.mode !== 'online' || voiceOptOut) {
+      renderVoice();
+      return;
+    }
+    V.join(session.code, session.playerIdx, session.myName).catch(function () {
+      // Mic blocked or unavailable — the voice box shows "Enable voice".
+      renderVoice();
+    });
+    renderVoice();
+  }
+
+  function renderVoice() {
+    var V = window.AzulVoice;
+    var snap = V ? V.snapshot()
+      : { active: false, joining: false, blocked: false, muted: false, members: [] };
+    var inOnline = !!(session && session.mode === 'online');
+    document.querySelectorAll('.voice-box').forEach(function (box) {
+      box.classList.toggle('hidden', !inOnline);
+      if (!inOnline) return;
+      var status = box.querySelector('.voice-status');
+      var members = box.querySelector('.voice-members');
+      var muteBtn = box.querySelector('.btn-voice-mute');
+      var toggleBtn = box.querySelector('.btn-voice-toggle');
+      if (status) {
+        status.textContent = snap.joining ? '· connecting…'
+          : snap.active ? '· on'
+          : snap.blocked ? '· mic blocked' : '· off';
+      }
+      if (members) {
+        members.innerHTML = snap.members.length ? snap.members.map(function (m) {
+          return '<span class="voice-chip' + (m.speaking ? ' speaking' : '') +
+            (m.muted ? ' is-muted' : '') + '">' +
+            (m.speaking ? '🔊 ' : '🎙️ ') + esc(m.name) + (m.me ? ' (you)' : '') +
+            (m.muted ? ' 🔇' : '') +
+            (!m.me && snap.active && !m.connected ? ' · connecting…' : '') +
+            '</span>';
+        }).join('') : '<span class="voice-none">Nobody in voice yet</span>';
+      }
+      if (muteBtn) {
+        muteBtn.disabled = !snap.active;
+        muteBtn.textContent = snap.muted ? '🔊 Unmute' : '🔇 Mute';
+      }
+      if (toggleBtn) {
+        toggleBtn.textContent = (snap.active || snap.joining) ? 'Leave voice' : 'Enable voice';
+      }
+    });
+  }
+
+  function wireVoice() {
+    if (window.AzulVoice) {
+      window.AzulVoice.setCallbacks({ onChange: function () { renderVoice(); } });
+    }
+    document.querySelectorAll('.btn-voice-mute').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var V = window.AzulVoice;
+        if (V) V.setMuted(!V.snapshot().muted);
+      });
+    });
+    document.querySelectorAll('.btn-voice-toggle').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var V = window.AzulVoice;
+        if (!V || !session || session.mode !== 'online') return;
+        if (V.isActive()) {
+          voiceOptOut = true;
+          V.leave();
+        } else {
+          voiceOptOut = false;
+          V.join(session.code, session.playerIdx, session.myName)
+            .catch(function (err) { toast(err.message || 'Microphone unavailable', true); });
+        }
+        renderVoice();
+      });
+    });
+  }
+
   // ------------------------------------------------------------ game over --
   function renderGameOver() {
     var s = session.state;
@@ -777,6 +865,7 @@
   }
 
   function goHome() {
+    if (window.AzulVoice) window.AzulVoice.leave();
     try { window.sessionStorage.removeItem('azul-session'); } catch (e) { /* ignore */ }
     show('screen-home');
   }
@@ -787,6 +876,12 @@
     wireLobby();
     wireGame();
     wireGameOver();
+    wireVoice();
+
+    // First tap anywhere also unlocks remote voice audio (autoplay rules).
+    document.addEventListener('pointerdown', function () {
+      if (window.AzulVoice) window.AzulVoice.unlockAudio();
+    });
 
     // Prefill the remembered name.
     try {
