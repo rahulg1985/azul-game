@@ -152,13 +152,10 @@
     if (!snap.exists()) throw new Error('Room ' + code + ' not found.');
     var room = snap.val();
     var players = room.players || [];
-    var saved = storedSeat(code);
-    // Reclaim a stored seat only when it belongs to the name just entered —
-    // a different name means a different player who happens to share this
-    // browser (e.g. a second tab), and they must join as a new seat.
-    if (saved && saved.name === name && players[saved.playerIdx] === saved.name) {
-      return { code: code, playerIdx: saved.playerIdx };
-    }
+    // NOTE: no stored-seat reclaim here. A stored seat belongs to whoever
+    // used this browser before; trusting it silently seats a new player in
+    // someone else's chair. Rejoin works by name instead: the byName
+    // branches below return the seat whose name matches the entered name.
     var byName = players.indexOf(name);
     if (byName !== -1 && room.meta.status !== 'lobby') {
       saveSeat(code, name, byName);
