@@ -741,13 +741,11 @@
         ? s.factories[selection.source.index] : s.center;
       var n = srcTiles.filter(function (t) { return t === selection.color; }).length;
       var from = selection.source.kind === 'factory'
-        ? 'factory ' + (selection.source.index + 1) : 'the center';
+        ? 'Factory ' + (selection.source.index + 1) : 'the Center';
       hint = n + ' ' + selection.color + ' tile' + (n === 1 ? '' : 's') + ' selected' +
-        ' from ' + from + ' — tap a highlighted pattern line on ' + cur.name +
-        '’s board, or the floor line.';
+        ' from ' + from + ' — tap a highlighted pattern line, or the floor line.';
     } else if (canInteract()) {
-      hint = session.mode === 'online' ? 'Your move — tap a group of tiles to pick them up.'
-                                       : cur.name + ' — tap a group of tiles to pick them up.';
+      hint = 'Tap a group of tiles to pick them up.';
     }
     $('#selection-hint').textContent = hint;
 

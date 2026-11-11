@@ -348,9 +348,11 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
    never block tapping a neighbouring tile to change the selection. */
 .factory .tile-group.selected { position: relative; z-index: 2; }
 .factory .tile-group.selected .tile { transform: translateY(-2px) scale(1.3); pointer-events: none; }
-/* In the center (a flex row) selected tiles grow for real — the layout
-   reflows around them, so there is no overlap at all. */
-.center-pile .tile-group.selected .tile { width: calc(var(--tile-mini) * 1.3); height: calc(var(--tile-mini) * 1.3); }
+/* Selected center tiles grow paint-only (transform), exactly like the
+   factories: the center pile's arrangement and height must never change
+   when tiles are selected. */
+.center-pile .tile-group.selected { position: relative; z-index: 2; }
+.center-pile .tile-group.selected .tile { transform: translateY(-2px) scale(1.3); pointer-events: none; }
 .center-pile {
   min-height: calc(var(--tile-size) + 30px);
   border: 2px dashed var(--line);
@@ -578,7 +580,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
   .boards { grid-template-columns: 1fr 1fr; }
   .board.turn { grid-column: 1 / -1; }
 }
-.selection-hint { min-height: 1.3em; color: #8fc1f5; font-weight: 600; font-size: .94rem; margin: 8px 2px 2px; }
+.selection-hint { min-height: 1.3em; color: #8fc1f5; font-weight: 600; font-size: .92rem; margin: 8px 2px 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Sticky bottom action bar — rides above the phone's safe area and never
    covers the boards (sticky, so it takes its own space in the flow). */
 .game-actions {
