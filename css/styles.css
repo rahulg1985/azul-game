@@ -863,3 +863,4 @@ body.in-game .fs-btn.hidden { display: none; /* JS hides it when unsupported */ 
   border-radius: 14px;
   box-shadow: 0 8px 26px rgba(0, 0, 0, .5);
 }
+.how-panel .how-intro { font-style: italic; opacity: .92; }

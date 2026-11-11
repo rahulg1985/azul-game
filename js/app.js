@@ -384,7 +384,7 @@
     return window.AzulOnline.init().then(function (ready) {
       if (!ready) {
         $('#online-unavailable').classList.remove('hidden');
-        toast("Online play isn't set up yet on this copy — local games work fully.", true);
+        toast("Online play isn't available in this copy — local games work fully.", true);
       }
       return ready;
     });
@@ -541,7 +541,7 @@
       startBtn.disabled = players.length < 2;
       $('#lobby-status').textContent = players.length < 2
         ? 'Waiting for at least one more player to join…'
-        : 'Everyone in? Start when ready — late joiners can’t enter a running game.';
+        : 'Everyone in? Tap Start when ready — players can’t join once the game begins.';
     } else {
       startBtn.classList.add('hidden');
       $('#lobby-status').textContent = 'Waiting for the host to start the game…';
@@ -683,13 +683,13 @@
       sub = '';
     } else if (session.mode === 'online' && s.currentPlayer !== session.playerIdx) {
       main = 'Round ' + s.round + ' — ' + cur.name + '’s turn';
-      sub = 'Waiting for ' + cur.name + ' to play…';
+      sub = 'Waiting for ' + cur.name + ' to make a move…';
     } else if (session.mode === 'online') {
       main = 'Round ' + s.round + ' — your turn!';
-      sub = 'Tap tiles in a factory or the center, then tap where they go.';
+      sub = 'Draft tiles from a factory or the center, then place them on a line.';
     } else {
       main = 'Round ' + s.round + ' — ' + cur.name + '’s turn';
-      sub = 'Pass the device to ' + cur.name + ', then tap tiles to draft.';
+      sub = 'Pass the device to ' + cur.name + ' — draft tiles from a factory or the center.';
     }
     var chips = s.players.map(function (p, i) {
       return '<span class="score-chip' + (i === s.currentPlayer && s.phase === 'draft' ? ' active' : '') + '">' +
@@ -725,12 +725,12 @@
       var n = srcTiles.filter(function (t) { return t === selection.color; }).length;
       var from = selection.source.kind === 'factory'
         ? 'factory ' + (selection.source.index + 1) : 'the center';
-      hint = 'Selected ' + n + ' ' + selection.color + ' tile' + (n === 1 ? '' : 's') +
-        ' from ' + from + ' — now tap a highlighted pattern line on ' + cur.name +
-        '’s board, or their floor line.';
+      hint = n + ' ' + selection.color + ' tile' + (n === 1 ? '' : 's') + ' selected' +
+        ' from ' + from + ' — tap a highlighted pattern line on ' + cur.name +
+        '’s board, or the floor line.';
     } else if (canInteract()) {
-      hint = session.mode === 'online' ? 'Your move: Tap a group of tiles to pick them up.'
-                                       : cur.name + ': Tap a group of tiles to pick them up.';
+      hint = session.mode === 'online' ? 'Your move — tap a group of tiles to pick them up.'
+                                       : cur.name + ' — tap a group of tiles to pick them up.';
     }
     $('#selection-hint').textContent = hint;
 
@@ -942,7 +942,7 @@
       '<span class="board-score">★ ' + p.score + '</span></span></div>' +
       '<div class="board-main"><div class="pattern-lines">' + lines + '</div>' +
       '<div class="wall">' + wall + '</div></div>' +
-      '<div class="floor-line"><div class="floor-label">Floor line (penalties)</div>' +
+      '<div class="floor-line"><div class="floor-label">Floor line</div>' +
       '<div class="floor-slots' + (interact && selection ? ' droppable' : '') +
       '" data-owner="' + pi + '" data-dest-floor="1">' + floorSlots + '</div></div>' +
       '</div>';
@@ -1221,7 +1221,7 @@
             (m.muted ? ' 🔇' : '') +
             (!m.me && snap.active && !m.connected ? ' · Connecting…' : '') +
             '</span>';
-        }).join('') : '<span class="voice-none">Nobody in voice yet</span>';
+        }).join('') : '<span class="voice-none">No one in voice yet</span>';
       }
       if (muteBtn) {
         muteBtn.disabled = !snap.active;
@@ -1472,7 +1472,7 @@
     $('#celebration-title').textContent = title;
     $('#celebration-sub').textContent = isOnline && !isHost
       ? 'Waiting for the host to tap…'
-      : 'Tap anywhere to go back home';
+      : 'Tap anywhere to return home';
     $('#celebration').classList.remove('hidden');
 
     var finalKey = s.players.map(function (p) { return p.score; }).join(',') +
