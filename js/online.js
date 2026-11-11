@@ -1,0 +1,275 @@
+/*
+ * Azul — online mode adapter (Firebase Realtime Database).
+ *
+ * Exposes window.AzulOnline. Firebase compat SDKs are loaded dynamically
+ * from the gstatic CDN only when the user actually enters online mode, and
+ * only when js/config.js holds real (non-placeholder) values. If anything
+ * is missing, `init()` resolves to false and the UI shows "Online play
+ * isn't set up yet" — local mode never depends on this file.
+ *
+ * Room shape in RTDB:
+ *   rooms/{code} = {
+ *     meta:    { hostIdx: 0, status: 'lobby'|'playing'|'finished', createdAt },
+ *     players: ['Name', ...],                 // seat order; index = playerIdx
+ *     state:   <AzulEngine state JSON | null> // null while in the lobby
+ *   }
+ *
+ * Moves are applied with a transaction on rooms/{code}/state: the engine
+ * runs inside the transaction on the server-confirmed state, so two
+ * clients can never desync or move out of turn.
+ */
+(function () {
+  'use strict';
+
+  var SDK_VERSION = '10.12.5';
+  var SDK_FILES = ['firebase-app-compat.js', 'firebase-database-compat.js'];
+  var CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O/1/I/L
+
+  var db = null;
+  var initPromise = null;
+
+  function configIsPlaceholder(cfg) {
+    if (!cfg || typeof cfg !== 'object') return true;
+    if (!cfg.apiKey || !cfg.databaseURL) return true;
+    return /YOUR_[A-Z_]+/.test(cfg.apiKey) || /YOUR_[A-Z_]+/.test(cfg.databaseURL);
+  }
+
+  function loadScript(src) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = function () { reject(new Error('Failed to load ' + src)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  // Loads config (ES module) and the Firebase SDKs on first use.
+  // Resolves true when online play is ready, false when not configured.
+  function init() {
+    if (initPromise) return initPromise;
+    initPromise = (async function () {
+      var cfg = window.FIREBASE_CONFIG || null;
+      if (!cfg) {
+        try {
+          var mod = await import('./config.js');
+          cfg = mod.firebaseConfig || window.FIREBASE_CONFIG || null;
+        } catch (e) {
+          cfg = null;
+        }
+      }
+      if (configIsPlaceholder(cfg)) return false;
+      try {
+        for (var i = 0; i < SDK_FILES.length; i++) {
+          await loadScript(
+            'https://www.gstatic.com/firebasejs/' + SDK_VERSION + '/' + SDK_FILES[i]
+          );
+        }
+        if (!window.firebase) return false;
+        if (!window.firebase.apps.length) window.firebase.initializeApp(cfg);
+        db = window.firebase.database();
+        return true;
+      } catch (e) {
+        return false;
+      }
+    })();
+    return initPromise;
+  }
+
+  function isReady() {
+    return !!db;
+  }
+
+  function makeCode() {
+    var code = '';
+    var arr = new Uint32Array(6);
+    window.crypto.getRandomValues(arr);
+    for (var i = 0; i < 6; i++) code += CODE_ALPHABET[arr[i] % CODE_ALPHABET.length];
+    return code;
+  }
+
+  function roomRef(code) {
+    return db.ref('rooms/' + code);
+  }
+
+  function storageKey(code) {
+    return 'azul-room-' + code;
+  }
+
+  function storedSeat(code) {
+    try {
+      var raw = window.localStorage.getItem(storageKey(code));
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveSeat(code, name, playerIdx) {
+    try {
+      window.localStorage.setItem(
+        storageKey(code),
+        JSON.stringify({ name: name, playerIdx: playerIdx })
+      );
+    } catch (e) { /* private mode etc. — rejoin by name still works in lobby */ }
+  }
+
+  function forgetSeat(code) {
+    try {
+      window.localStorage.removeItem(storageKey(code));
+    } catch (e) { /* ignore */ }
+  }
+
+  // ------------------------------------------------------------- rooms ------
+  async function createRoom(name) {
+    for (var attempt = 0; attempt < 8; attempt++) {
+      var code = makeCode();
+      var ref = roomRef(code);
+      var snap = await ref.once('value');
+      if (snap.exists()) continue; // code collision — try another
+      await ref.set({
+        meta: {
+          hostIdx: 0,
+          status: 'lobby',
+          createdAt: window.firebase.database.ServerValue.TIMESTAMP
+        },
+        players: [name],
+        state: null
+      });
+      saveSeat(code, name, 0);
+      return { code: code, playerIdx: 0 };
+    }
+    throw new Error('Could not create a room — please try again.');
+  }
+
+  async function joinRoom(code, name) {
+    code = String(code || '').trim().toUpperCase();
+    if (!/^[A-Z0-9]{6}$/.test(code)) throw new Error('Room codes are 6 characters.');
+    var ref = roomRef(code);
+
+    // Rejoin: a stored seat (or an exact name match) in an existing room.
+    var snap = await ref.once('value');
+    if (!snap.exists()) throw new Error('Room ' + code + ' not found.');
+    var room = snap.val();
+    var players = room.players || [];
+    var saved = storedSeat(code);
+    if (saved && players[saved.playerIdx] === saved.name) {
+      return { code: code, playerIdx: saved.playerIdx };
+    }
+    var byName = players.indexOf(name);
+    if (byName !== -1 && room.meta.status !== 'lobby') {
+      saveSeat(code, name, byName);
+      return { code: code, playerIdx: byName };
+    }
+    if (room.meta.status !== 'lobby') {
+      throw new Error('That game has already started.');
+    }
+    if (byName !== -1) {
+      saveSeat(code, name, byName);
+      return { code: code, playerIdx: byName };
+    }
+    if (players.length >= 4) throw new Error('That room is full (4 players).');
+
+    // Append the seat atomically; bail if the room filled up meanwhile.
+    var myIdx = -1;
+    var result = await ref.child('players').transaction(function (current) {
+      var list = current || [];
+      if (list.length >= 4) return undefined; // abort
+      myIdx = list.length;
+      list.push(name);
+      return list;
+    });
+    if (!result.committed || myIdx === -1) {
+      throw new Error('That room just filled up.');
+    }
+    saveSeat(code, name, myIdx);
+    return { code: code, playerIdx: myIdx };
+  }
+
+  // Subscribe to a room. cb(roomObject | null). Returns an unsubscribe fn.
+  function watchRoom(code, cb) {
+    var ref = roomRef(code);
+    var handler = function (snap) { cb(snap.val()); };
+    ref.on('value', handler);
+    return function () { ref.off('value', handler); };
+  }
+
+  // Host only: build a fresh engine state from the seated names and flip
+  // the room to 'playing'. Also used for "Play again".
+  async function startGame(code) {
+    var ref = roomRef(code);
+    var snap = await ref.child('players').once('value');
+    var names = snap.val() || [];
+    if (names.length < 2) throw new Error('You need at least 2 players to start.');
+    var seed = Math.floor(Math.random() * 0xffffffff);
+    var state = window.AzulEngine.createGame(names, seed);
+    await ref.update({
+      state: state,
+      'meta/status': 'playing'
+    });
+  }
+
+  // Apply one draft move through a transaction on the authoritative state.
+  async function submitMove(code, playerIdx, move) {
+    var ref = roomRef(code).child('state');
+    var error = null;
+    var result = await ref.transaction(function (current) {
+      if (!current) {
+        error = 'The game has not started yet.';
+        return undefined;
+      }
+      try {
+        // `current` is a fresh JSON copy owned by the SDK — safe to mutate.
+        return window.AzulEngine.applyDraft(current, playerIdx, move);
+      } catch (e) {
+        error = e.message;
+        return undefined; // abort — state unchanged
+      }
+    });
+    if (!result.committed) {
+      throw new Error(error || 'That move was rejected — the game may have moved on.');
+    }
+    var newState = result.snapshot.val();
+    if (newState && newState.phase === 'finished') {
+      await roomRef(code).update({ 'meta/status': 'finished' });
+    }
+    return newState;
+  }
+
+  // Leave a room. While it is still a lobby, the seat is removed (other
+  // clients re-derive their seat index by name). Mid-game, leaving only
+  // unsubscribes locally — the seat stays so the player can rejoin.
+  async function leaveRoom(code, playerIdx) {
+    try {
+      var ref = roomRef(code);
+      var snap = await ref.once('value');
+      if (snap.exists() && snap.val().meta.status === 'lobby') {
+        await ref.child('players').transaction(function (current) {
+          var list = current || [];
+          if (playerIdx >= 0 && playerIdx < list.length) list.splice(playerIdx, 1);
+          return list;
+        });
+        var after = await ref.child('players').once('value');
+        if (!after.exists() || (after.val() || []).length === 0) {
+          await ref.remove(); // last one out deletes the room
+        }
+      }
+    } finally {
+      forgetSeat(code);
+    }
+  }
+
+  window.AzulOnline = {
+    init: init,
+    isReady: isReady,
+    createRoom: createRoom,
+    joinRoom: joinRoom,
+    watchRoom: watchRoom,
+    startGame: startGame,
+    submitMove: submitMove,
+    leaveRoom: leaveRoom,
+    storedSeat: storedSeat,
+    saveSeat: saveSeat,
+    forgetSeat: forgetSeat
+  };
+})();

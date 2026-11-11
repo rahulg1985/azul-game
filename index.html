@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Azul — Tile Game</title>
+<meta name="description" content="Azul tile game — play locally with friends on one device, or online by sharing a room link.">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%232f6fd0'/><rect x='26' y='26' width='48' height='48' rx='8' transform='rotate(45 50 50)' fill='%23f5f1e6'/></svg>">
+</head>
+<body>
+<header class="app-header">
+  <div class="logo-tiles" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+  <h1>Azul</h1>
+  <p class="subtitle">Tile Game</p>
+</header>
+
+<main>
+  <!-- ============================ HOME ============================ -->
+  <section id="screen-home" class="screen">
+    <div class="card">
+      <h2>🏠 Local game</h2>
+      <p class="card-sub">Pass-and-play on this device — 2 to 4 players, full Azul rules.</p>
+      <label class="field-label" for="local-count">Number of players</label>
+      <div class="count-picker" id="local-count" role="radiogroup" aria-label="Number of players">
+        <button type="button" data-count="2" class="active">2</button>
+        <button type="button" data-count="3">3</button>
+        <button type="button" data-count="4">4</button>
+      </div>
+      <div id="local-names">
+        <input type="text" class="local-name" maxlength="16" placeholder="Player 1 name" autocomplete="off">
+        <input type="text" class="local-name" maxlength="16" placeholder="Player 2 name" autocomplete="off">
+        <input type="text" class="local-name hidden" maxlength="16" placeholder="Player 3 name" autocomplete="off">
+        <input type="text" class="local-name hidden" maxlength="16" placeholder="Player 4 name" autocomplete="off">
+      </div>
+      <button id="btn-local-start" class="btn primary big">Start local game</button>
+    </div>
+
+    <div class="card" id="online-card">
+      <h2>🌐 Online game</h2>
+      <p class="card-sub">Play with friends anywhere. Create a room, share the invite link, and they join right from their browser — no account needed.</p>
+      <div id="online-unavailable" class="notice hidden">
+        Online play isn’t set up yet on this copy of the game — local games work fully.
+        (To enable it, add your Firebase keys in <code>js/config.js</code> — see the README.)
+      </div>
+      <div id="online-actions">
+        <label class="field-label" for="online-name">Your name</label>
+        <input type="text" id="online-name" maxlength="16" placeholder="Your name" autocomplete="off">
+        <p id="invite-note" class="invite-note hidden"></p>
+        <button id="btn-create-room" class="btn primary big">Create online game</button>
+        <div class="join-row">
+          <input type="text" id="join-code" maxlength="6" placeholder="Room code" autocomplete="off" autocapitalize="characters">
+          <button id="btn-join-room" class="btn">Join game</button>
+        </div>
+      </div>
+    </div>
+
+    <p class="foot-note">Unofficial fan implementation for personal play. Not affiliated with Plan B Games.</p>
+  </section>
+
+  <!-- ============================ LOBBY ============================ -->
+  <section id="screen-lobby" class="screen hidden">
+    <div class="card">
+      <h2>Room <span id="lobby-code" class="room-code"></span></h2>
+      <p class="card-sub">Share this link — friends tap it, type a name, and they’re in.</p>
+      <div class="invite-row">
+        <input type="text" id="invite-link" readonly>
+        <button id="btn-copy-link" class="btn primary">Copy invite link</button>
+      </div>
+      <h3 class="lobby-players-title">Players <span id="lobby-count"></span></h3>
+      <ul id="lobby-players" class="lobby-players"></ul>
+      <p id="lobby-status" class="lobby-status"></p>
+      <button id="btn-start-online" class="btn primary big hidden">Start game</button>
+      <button id="btn-leave-room" class="btn subtle">Leave room</button>
+    </div>
+  </section>
+
+  <!-- ============================ GAME ============================ -->
+  <section id="screen-game" class="screen hidden">
+    <div id="turn-banner" class="turn-banner"></div>
+
+    <div class="table-area card">
+      <h3 class="table-title">Factories</h3>
+      <div id="factories" class="factories"></div>
+      <h3 class="table-title">Center</h3>
+      <div id="center-pile" class="center-pile"></div>
+      <p id="selection-hint" class="selection-hint"></p>
+    </div>
+
+    <div id="boards" class="boards"></div>
+
+    <div class="game-actions">
+      <button id="btn-quit-game" class="btn subtle">Leave game</button>
+    </div>
+  </section>
+
+  <!-- ========================== GAME OVER ========================== -->
+  <section id="screen-gameover" class="screen hidden">
+    <div class="card">
+      <h2 id="gameover-title">Game over</h2>
+      <div id="gameover-results"></div>
+      <button id="btn-play-again" class="btn primary big">Play again</button>
+      <p id="play-again-note" class="lobby-status hidden">Waiting for the host to start a new game…</p>
+      <button id="btn-gameover-home" class="btn subtle">Back to home</button>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="toast hidden" role="status"></div>
+
+<script src="js/engine.js"></script>
+<!-- js/config.js is an ES module; js/online.js imports it on demand. -->
+<script src="js/online.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
