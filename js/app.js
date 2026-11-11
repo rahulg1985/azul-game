@@ -170,7 +170,7 @@
     if (!ensureAudio()) return;
     var ctx = audioCtx;
     var t = ctx.currentTime;
-    var dur = 0.9;
+    var dur = 1.2;
     var len = Math.max(1, Math.floor(ctx.sampleRate * dur));
     var buf = ctx.createBuffer(1, len, ctx.sampleRate);
     var d = buf.getChannelData(0);
@@ -943,10 +943,10 @@
     });
   }
 
-  // Fly the selected tiles around the screen and into the chosen row,
-  // THEN make the move: the tiles swoop up and across before landing
-  // (with a whoosh), and only then does the turn pass and the next
-  // player get announced.
+  // Fly the selected tiles in a slow circular arc — down and to the
+  // right — into the exact slots they will occupy, with a whoosh. They
+  // rest there for a full second so everyone can see what was played,
+  // and only then does the move apply and the boards switch.
   function flyAndMove(dest, targetEl) {
     if (flying || !selection) return;
     var tiles = [];
@@ -959,10 +959,35 @@
     }
     flying = true;
     playWhoosh();
-    var tr = targetEl.getBoundingClientRect();
-    var ex = dest === 'floor' ? tr.left + tr.width * 0.72 : tr.right - tr.height * 0.55;
-    var ey = tr.top + tr.height / 2;
+
+    // Landing spots: the exact slots the tiles are about to occupy
+    // (overflow past a full pattern line runs to the floor line).
+    var s = session.state;
+    var cur = s.players[s.currentPlayer];
+    function spotCenter(el, fallbackEl, fx) {
+      var r = (el || fallbackEl).getBoundingClientRect();
+      return el
+        ? { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+        : { x: r.left + r.width * fx, y: r.top + r.height / 2 };
+    }
+    var spots = tiles.map(function (t, i) {
+      if (dest === 'floor') {
+        var fslot = targetEl.querySelectorAll('.floor-slot')[cur.floor.length + i];
+        return spotCenter(fslot, targetEl, 0.3 + 0.14 * i);
+      }
+      var lineLen = cur.patternLines[dest].length;
+      var free = (dest + 1) - lineLen;
+      if (i < free) {
+        return spotCenter(targetEl.querySelectorAll('.slot')[lineLen + i], targetEl, 0.8);
+      }
+      var board = targetEl.closest('.board');
+      var ofSlot = board
+        ? board.querySelectorAll('.floor-slot')[cur.floor.length + (i - free)] : null;
+      return spotCenter(ofSlot, targetEl, 0.8);
+    });
+
     var clones = [];
+    var FLIGHT_MS = 1150;
     tiles.forEach(function (t, i) {
       var r = t.getBoundingClientRect();
       var clone = t.cloneNode(true);
@@ -975,22 +1000,34 @@
       clones.push(clone);
       var sx = r.left + r.width / 2;
       var sy = r.top + r.height / 2;
-      var endX = ex + (i - (tiles.length - 1) / 2) * 7;
-      var endY = ey + (i % 2 === 0 ? -3 : 3);
-      // The "around the screen" waypoint: high above both endpoints.
-      var wx = (sx + endX) / 2 + (i % 2 === 0 ? -50 : 50);
-      var wy = Math.min(sy, endY) - 180;
-      clone.animate([
-        { transform: 'translate(0px, 0px) rotate(0deg) scale(1)' },
-        { transform: 'translate(' + (wx - sx) + 'px, ' + (wy - sy) + 'px) rotate(30deg) scale(1.2)', offset: 0.48 },
-        { transform: 'translate(' + (endX - sx) + 'px, ' + (endY - sy) + 'px) rotate(0deg) scale(1)' }
-      ], { duration: 980, delay: i * 85, easing: 'cubic-bezier(.45, .05, .35, 1)', fill: 'forwards' });
+      var ex = spots[i].x;
+      var ey = spots[i].y;
+      // Circular motion: a quadratic arc bulging down-right, with the
+      // tile making a full turn as it travels.
+      var cx = Math.max(sx, ex) + 110;
+      var cy = (sy + ey) / 2;
+      var frames = [];
+      var STEPS = 6;
+      for (var k = 0; k <= STEPS; k++) {
+        var u = k / STEPS;
+        var bx = (1 - u) * (1 - u) * sx + 2 * (1 - u) * u * cx + u * u * ex;
+        var by = (1 - u) * (1 - u) * sy + 2 * (1 - u) * u * cy + u * u * ey;
+        frames.push({
+          transform: 'translate(' + (bx - sx) + 'px, ' + (by - sy) + 'px) rotate(' +
+            (360 * u) + 'deg) scale(' + (1 + 0.15 * Math.sin(Math.PI * u)) + ')',
+          offset: u
+        });
+      }
+      clone.animate(frames, {
+        duration: FLIGHT_MS, delay: i * 90, easing: 'ease-in-out', fill: 'forwards'
+      });
     });
+    // Land -> rest 1s with the tiles sitting in the row -> move applies.
     setTimeout(function () {
       clones.forEach(function (c) { c.remove(); });
       flying = false;
       attemptMove(dest);
-    }, 980 + (tiles.length - 1) * 85 + 70);
+    }, FLIGHT_MS + (tiles.length - 1) * 90 + 1000);
   }
 
   function attemptMove(dest) {
@@ -1192,13 +1229,14 @@
         '<span class="round-net">' + (net >= 0 ? '+' : '') + net + '</span>' +
         '<span class="round-total">★ ' + p.score + '</span></div>';
     }).join('');
-    $('#round-next').textContent = 'Round ' + s.round + ' starting now…';
+    $('#round-next').textContent = 'Tap anywhere to start Round ' + s.round;
     $('#round-overlay').classList.remove('hidden');
     var text = 'Round ' + ended + ' over. ' + s.players.map(function (p) {
       return p.name + ': ' + p.score + ' points';
-    }).join('. ') + '. Round ' + s.round + ' starting now.';
-    armRoundOverlay(12000);
-    speakAloud(text, function () { armRoundOverlay(700); });
+    }).join('. ') + '. Tap to start round ' + s.round + '.';
+    // Tap-only: the next round never starts on its own — no auto-dismiss
+    // after the speech, and no time cap.
+    speakAloud(text);
   }
 
   function announceFinalScores(s) {
