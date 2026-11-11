@@ -16,7 +16,7 @@
   --azul-teal: #175d6e;
   --surface: #17233c;
   --text: #e9eef7;
-  --board-gap: 6px;
+  --board-gap: 8px;
   --screen-pad: clamp(4px, 1.2vw, 14px);
   /* ---- existing palette (kept; everything derives from the vars above) ---- */
   --ink: var(--text);
@@ -310,7 +310,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 }
 
 /* ----------------------------------------------------------------- table */
-.table-area { padding: 1px 6px 0; }
+.table-area { padding: 0 6px; margin-bottom: 6px; }
 .table-title {
   margin: 0;
   line-height: 1.1;
@@ -321,7 +321,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 }
 .factories { display: flex; flex-wrap: wrap; gap: var(--board-gap); margin-bottom: 6px; }
 .factory {
-  width: calc(var(--tile-mini) * 2 + 30px); height: calc(var(--tile-mini) * 2 + 30px);
+  width: calc(var(--tile-mini) * 2 + 44px); height: calc(var(--tile-mini) * 2 + 44px);
   border-radius: 50%;
   background: radial-gradient(circle at 50% 38%, #fdf6e0, #e9dbb6 72%, #d9c48f);
   border: 3px solid #175d6e;
