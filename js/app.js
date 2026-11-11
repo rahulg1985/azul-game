@@ -113,6 +113,25 @@
     return audioCtx;
   }
 
+  // iOS/Safari keep WebAudio and speech locked until a real user gesture
+  // unlocks them; the first sound here is often attempted from a timer or
+  // a sync callback, which leaves both silently dead. Prime both on the
+  // first tap anywhere.
+  var speechPrimed = false;
+  function unlockAudio() {
+    if (soundOn) ensureAudio();
+    if (!speechPrimed && ('speechSynthesis' in window)) {
+      speechPrimed = true;
+      try {
+        var prime = new SpeechSynthesisUtterance('ready');
+        prime.volume = 0;
+        window.speechSynthesis.speak(prime);
+        window.speechSynthesis.resume();
+      } catch (e) { /* ignore */ }
+    }
+  }
+  document.addEventListener('pointerdown', unlockAudio, true);
+
   // One ceramic "clack": a woody knock (pitch-dropping triangle) + a short
   // filtered-noise click, like a tile tapped on a board.
   function ceramicClack(delay, baseFreq, vol) {
@@ -168,18 +187,25 @@
     });
   }
 
-  // After the boards finish shuffling (~1s), announce whose turn it is.
+  // After the boards finish shuffling, announce whose turn it is.
   function speakTurn(name) {
     if (!soundOn || !('speechSynthesis' in window)) return;
     if (speakTimer) clearTimeout(speakTimer);
     speakTimer = setTimeout(function () {
       try {
         window.speechSynthesis.cancel();
-        var u = new SpeechSynthesisUtterance(name + '’s turn now');
-        u.rate = 1.02;
-        window.speechSynthesis.speak(u);
+        // iOS drops an utterance spoken in the same tick as a cancel() —
+        // give it a beat, and resume() in case the queue was left paused.
+        setTimeout(function () {
+          try {
+            window.speechSynthesis.resume();
+            var u = new SpeechSynthesisUtterance(name + '’s turn now');
+            u.rate = 1.02;
+            window.speechSynthesis.speak(u);
+          } catch (e) { /* ignore */ }
+        }, 60);
       } catch (e) { /* ignore */ }
-    }, 1100);
+    }, 1500);
   }
 
   function setSound(on) {
@@ -707,6 +733,9 @@
       } catch (e) {
         bannerEl.scrollIntoView({ block: 'start' });
       }
+      // Sounds first, so an animation hiccup can never eat them.
+      playPlace();
+      if (!justEndedRound) speakTurn(cur.name); // round-end dictation takes over
       if (!REDUCED_MOTION) {
         var inBoard = boardsEl.querySelector('.board.turn');
         var outBoard = prevPlayer !== null && prevPlayer !== s.currentPlayer
@@ -728,8 +757,6 @@
         });
         if (inBoard) inBoard.classList.add('turn-enter');
       }
-      playPlace();
-      if (!justEndedRound) speakTurn(cur.name); // round-end dictation takes over
     }
     renderVoice();
   }
@@ -1026,7 +1053,13 @@
       u.rate = 1.02;
       u.onend = finish;
       u.onerror = finish;
-      window.speechSynthesis.speak(u);
+      // Same iOS cancel-then-speak race as speakTurn: wait a beat first.
+      setTimeout(function () {
+        try {
+          window.speechSynthesis.resume();
+          window.speechSynthesis.speak(u);
+        } catch (e) { finish(); }
+      }, 60);
       setTimeout(finish, 12000); // fallback if onend never fires
     } catch (e) {
       if (onEnd) setTimeout(finish, 3400);
