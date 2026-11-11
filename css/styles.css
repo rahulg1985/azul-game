@@ -583,6 +583,14 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
   .boards { grid-template-columns: 1fr 1fr; }
   .board.turn { grid-column: 1 / -1; }
 }
+/* Desktop and tablet landscape: every board takes one equal grid cell —
+   no full-width turn board, no 600px cap — so all boards are the same
+   size, two per row. The min-height guard leaves the landscape-phone
+   layout (max-height 540px, active board spans its column) untouched. */
+@media (min-width: 769px) and (min-height: 541px) {
+  .board.turn { grid-column: auto; }
+  .board { max-width: none; margin-inline: 0; }
+}
 .selection-hint { min-height: 1.3em; color: #8fc1f5; font-weight: 600; font-size: .92rem; margin: 3px 2px 0; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Sticky bottom action bar — rides above the phone's safe area and never
    covers the boards (sticky, so it takes its own space in the flow). */
