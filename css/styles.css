@@ -890,3 +890,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
   box-shadow: 0 8px 26px rgba(0, 0, 0, .5);
 }
 .how-panel .how-intro { font-style: italic; opacity: .92; }
+
+/* Originals hide while their flying copies are in the air, so tiles
+   never appear in two places at once during a flight. */
+.tile-away { visibility: hidden !important; }

@@ -1118,6 +1118,11 @@
         duration: FLIGHT_MS, delay: delay, easing: 'ease-in-out', fill: 'forwards'
       });
     }
+    // Hide the originals while their copies fly — no duplicated tiles.
+    tiles.forEach(function (t) {
+      var g = t.closest('.tile-group');
+      if (g) g.classList.add('tile-away');
+    });
     tiles.forEach(function (t, i) { spawnFlight(t, spots[i].x, spots[i].y, i * 90); });
 
     // The factory's leftover tiles fly to the center pile at the same
@@ -1133,6 +1138,10 @@
         factoryEl.querySelectorAll('.tile-group:not(.selected) .tile')
           .forEach(function (t) { leftTiles.push(t); });
         leftoverCount = leftTiles.length;
+        leftTiles.forEach(function (t) {
+          var g = t.closest('.tile-group');
+          if (g) g.classList.add('tile-away');
+        });
         leftTiles.forEach(function (t, j) {
           var ex = cr.left + cr.width / 2 +
             (j - (leftTiles.length - 1) / 2) * (cr.width > 140 ? 26 : 12);
@@ -1144,6 +1153,9 @@
     // Land -> the move applies at once (tiles take their real positions,
     // selection clears) -> renderGame holds the turn switch for 1s.
     setTimeout(function () {
+      document.querySelectorAll('.tile-away').forEach(function (el) {
+        el.classList.remove('tile-away');
+      });
       clones.forEach(function (c) { c.remove(); });
       holdNextSwitch = true;
       attemptMove(dest);
