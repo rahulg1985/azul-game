@@ -9,6 +9,7 @@
   var E = window.AzulEngine;
   var $ = function (sel) { return document.querySelector(sel); };
 
+  var PLAYER_COLORS = ['#f5b942', '#43c6e8', '#ff8a7a', '#9fe870'];
   var REDUCED_MOTION = !!(window.matchMedia &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
@@ -692,29 +693,27 @@
     var prevHint = $('#selection-hint').textContent;
     var cur = s.players[s.currentPlayer];
 
-    // --- banner ---
+    // --- banner (overlay on the factories section: no layout height) ---
     var main;
-    var sub;
     if (s.phase === 'finished') {
       main = 'Game finished';
-      sub = '';
     } else if (session.mode === 'online' && s.currentPlayer !== session.playerIdx) {
       main = 'Round ' + s.round + ' — ' + cur.name + '’s turn';
-      sub = 'Waiting for ' + cur.name + ' to make a move…';
     } else if (session.mode === 'online') {
       main = 'Round ' + s.round + ' — your turn!';
-      sub = 'Draft tiles from a factory or the center, then place them on a line.';
     } else {
       main = 'Round ' + s.round + ' — ' + cur.name + '’s turn';
-      sub = 'Pass the device to ' + cur.name + ' — draft tiles from a factory or the center.';
     }
     var chips = s.players.map(function (p, i) {
-      return '<span class="score-chip' + (i === s.currentPlayer && s.phase === 'draft' ? ' active' : '') + '">' +
-        esc(p.name) + ': ' + p.score + '</span>';
+      // Full name when short; otherwise the initial. Each seat has its
+      // own color.
+      var label = p.name.length <= 7 ? p.name : p.name.charAt(0).toUpperCase();
+      return '<span class="score-chip' + (i === s.currentPlayer && s.phase === 'draft' ? ' active' : '') + '"' +
+        ' style="--pc:' + PLAYER_COLORS[i % PLAYER_COLORS.length] + '">' +
+        '<b>' + esc(label) + '</b> ' + p.score + '</span>';
     }).join('');
     $('#turn-banner').innerHTML =
       '<div class="turn-main">' + esc(main) + '</div>' +
-      (sub ? '<div class="turn-sub">' + esc(sub) + '</div>' : '') +
       '<div class="score-chips">' + chips + '</div>';
 
     // --- factories ---
@@ -1500,8 +1499,7 @@
       return p.name + ' ★ ' + p.score;
     }).join(' · ');
     $('#turn-banner').innerHTML =
-      '<div class="turn-main">' + esc(title) + '</div>' +
-      '<div class="turn-sub">Final scores — ' + esc(scoresLine) + '</div>';
+      '<div class="turn-main">' + esc(title) + '</div>';
 
     var order = s.players.map(function (_, i) { return i; })
       .sort(function (a, b) { return s.players[b].score - s.players[a].score; });

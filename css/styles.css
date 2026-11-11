@@ -275,42 +275,43 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 /* ------------------------------------------------------------ turn banner */
 /* Compact in-game status bar: one row, ~44px — name/turn, round, score chips. */
 .turn-banner {
-  position: sticky;
-  top: 4px;
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  right: 10px;
   z-index: 20;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
+  pointer-events: none;
+}
+.turn-banner .turn-main {
   background: linear-gradient(160deg, #2a5ca8, #1d4e89);
   color: #fff;
   border: 1px solid #3f74b8;
-  border-radius: 10px;
-  padding: 7px 12px;
-  margin-bottom: 10px;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, .5);
-  min-height: 42px;
+  border-radius: 999px;
+  padding: 6px 14px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .45);
+  font-size: .95rem; font-weight: 800; white-space: nowrap;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis;
 }
-.turn-banner .turn-main { font-size: .98rem; font-weight: 800; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.turn-banner .turn-sub { opacity: .85; font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.turn-banner .score-chips { display: flex; flex-wrap: nowrap; gap: 6px; margin-left: auto; overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; justify-content: flex-end; }
-.turn-banner .score-chips::-webkit-scrollbar { display: none; }
+.turn-banner .score-chips { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; margin-left: auto; }
 .score-chip {
-  background: rgba(255, 255, 255, .16);
+  background: rgba(8, 16, 34, .62);
+  border: 1.5px solid var(--pc, #888);
   border-radius: 999px;
   padding: 2px 9px;
   font-size: .8rem;
   font-weight: 600;
   white-space: nowrap;
+  color: #fff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .35);
 }
-.score-chip.active { background: var(--gold); color: #231a00; }
-@media (max-width: 768px) {
-  /* The sub-line duplicates the main text + the hint below; drop it on
-     phones so the bar stays a single compact row. */
-  .turn-banner .turn-sub { display: none; }
-}
-
+.score-chip b { color: var(--pc, #fff); font-weight: 800; }
+.score-chip.active { background: var(--pc, var(--gold)); color: #141414; }
+.score-chip.active b { color: #141414; }
 /* ----------------------------------------------------------------- table */
-.table-area { padding: 10px; }
+.table-area { padding: 10px; position: relative; }
 .table-title {
   margin: 2px 0 6px;
   font-size: .78rem;
@@ -318,7 +319,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
   text-transform: uppercase;
   color: var(--ink-dim);
 }
-.factories { display: flex; flex-wrap: wrap; gap: var(--board-gap); margin-bottom: 10px; }
+.factories { display: flex; flex-wrap: wrap; gap: var(--board-gap); margin-bottom: 10px; padding: 42px 62px 0 0; }
 .factory {
   width: calc(var(--tile-mini) * 2 + 44px); height: calc(var(--tile-mini) * 2 + 44px);
   border-radius: 50%;
@@ -780,14 +781,12 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
     display: grid;
     grid-template-columns: minmax(0, 42fr) minmax(0, 58fr);
     grid-template-areas:
-      "banner banner"
       "voice voice"
       "table boards"
       "actions actions";
     gap: var(--board-gap);
     align-items: start;
   }
-  #screen-game #turn-banner { grid-area: banner; margin-bottom: 0; }
   #screen-game .voice-box { grid-area: voice; margin-bottom: 0; }
   #screen-game .table-area { grid-area: table; margin-bottom: 0; }
   #screen-game #boards { grid-area: boards; overflow-y: auto; max-height: calc(100dvh - 170px); }
