@@ -737,13 +737,8 @@
     // --- hint ---
     var hint = '';
     if (selection) {
-      var srcTiles = selection.source.kind === 'factory'
-        ? s.factories[selection.source.index] : s.center;
-      var n = srcTiles.filter(function (t) { return t === selection.color; }).length;
-      var from = selection.source.kind === 'factory'
-        ? 'Factory ' + (selection.source.index + 1) : 'the Center';
-      hint = n + ' ' + selection.color + ' tile' + (n === 1 ? '' : 's') + ' selected' +
-        ' from ' + from + ' — tap a highlighted pattern line, or the floor line.';
+      // Next step only — what was picked is already obvious on screen.
+      hint = 'Tap highlighted row to place the tile.';
     } else if (canInteract()) {
       hint = 'Tap a group of tiles to pick them up.';
     }
