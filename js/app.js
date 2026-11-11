@@ -409,27 +409,55 @@
     $('#selection-hint').textContent = hint;
 
     // --- boards: turn player first (full size), then the rest ---
+    var boardsEl = $('#boards');
+    var prevRects = {};
+    boardsEl.querySelectorAll('.board').forEach(function (b) {
+      var r = b.getBoundingClientRect();
+      // Document coordinates, so a page scroll between renders can't skew the deltas.
+      prevRects[b.dataset.player] = {
+        left: r.left + window.scrollX, top: r.top + window.scrollY,
+        width: r.width, height: r.height
+      };
+    });
     var order = s.players.map(function (_, i) { return i; });
     order.sort(function (a, b) {
       if (a === s.currentPlayer) return -1;
       if (b === s.currentPlayer) return 1;
       return a - b;
     });
-    $('#boards').innerHTML = order.map(function (pi) {
+    boardsEl.innerHTML = order.map(function (pi) {
       return boardHtml(s, pi);
     }).join('');
 
-    // Turn changed? Animate the new player's board in at the top, pulse the
-    // banner and scroll it into view so nobody misses the switch.
+    // Turn changed? FLIP-animate every board from its old spot to its new
+    // one: the old board glides down, the next player's board glides up
+    // into place — like the boards are being shuffled by hand (~1s).
     var turnKey = s.round + ':' + s.currentPlayer + ':' + s.phase;
-    if (lastTurnKey !== null && turnKey !== lastTurnKey && s.phase === 'draft') {
-      var topBoard = $('#boards .board.turn');
-      if (topBoard) topBoard.classList.add('turn-enter');
+    var turnChanged = lastTurnKey !== null && turnKey !== lastTurnKey && s.phase === 'draft';
+    lastTurnKey = turnKey;
+    if (turnChanged) {
       var bannerEl = $('#turn-banner');
       bannerEl.classList.add('pulse');
-      bannerEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      bannerEl.scrollIntoView({ block: 'start' });
+      boardsEl.querySelectorAll('.board').forEach(function (b) {
+        var old = prevRects[b.dataset.player];
+        if (!old || !b.animate) return;
+        var nr = b.getBoundingClientRect();
+        var dx = old.left - (nr.left + window.scrollX);
+        var dy = old.top - (nr.top + window.scrollY);
+        var sx = old.width / nr.width;
+        var sy = old.height / nr.height;
+        if (!dx && !dy && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) return;
+        b.style.zIndex = b.classList.contains('turn') ? 3 : 2;
+        var anim = b.animate([
+          { transform: 'translate(' + dx + 'px, ' + dy + 'px) scale(' + sx + ', ' + sy + ')' },
+          { transform: 'translate(0px, 0px) scale(1, 1)' }
+        ], { duration: 1000, easing: 'cubic-bezier(.3, .7, .3, 1)' });
+        anim.onfinish = function () { b.style.zIndex = ''; };
+      });
+      var topBoard = $('#boards .board.turn');
+      if (topBoard) topBoard.classList.add('turn-enter');
     }
-    lastTurnKey = turnKey;
   }
 
   function boardHtml(s, pi) {
@@ -480,7 +508,7 @@
     var youTag = session.mode === 'online' && pi === session.playerIdx
       ? ' <span class="you">(you)</span>' : '';
 
-    return '<div class="board' + (isTurnBoard ? ' turn' : ' compact') + '">' +
+    return '<div class="board' + (isTurnBoard ? ' turn' : ' compact') + '" data-player="' + pi + '">' +
       '<div class="board-head"><span class="board-name">' + esc(p.name) + youTag + '</span>' +
       '<span class="board-score">★ ' + p.score + '</span></div>' +
       '<div class="board-main"><div class="pattern-lines">' + lines + '</div>' +
