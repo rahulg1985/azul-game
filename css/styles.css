@@ -787,3 +787,12 @@ body.in-game .fs-btn.hidden { display: none; /* JS hides it when unsupported */ 
   }
   .congrats-gif { display: none; }
 }
+
+/* Tiles in flight between the factory/center and the chosen row. */
+.fly-tile {
+  position: fixed;
+  margin: 0;
+  z-index: 90;
+  pointer-events: none;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, .5);
+}

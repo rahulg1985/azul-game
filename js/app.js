@@ -89,6 +89,7 @@
   // }
   var session = null;
   var selection = null; // { source: {kind, index?}, color }
+  var flying = false; // tile flight animation in progress (input locked)
   var highlight = {};   // "playerIdx:row:col" -> true for just-tiled cells
   var lastTurnKey = null; // "round:currentPlayer" — drives the turn-change animation
   var voiceOptOut = false; // user tapped "Leave voice" in this room session
@@ -161,6 +162,30 @@
   function playPickup() { if (ensureAudio()) { ceramicClack(0, 920, 0.20); ceramicClack(0.07, 1180, 0.12); } }
   function playPutback() { if (ensureAudio()) ceramicClack(0, 700, 0.10); }
   function playPlace() { if (ensureAudio()) { ceramicClack(0, 620, 0.30); ceramicClack(0.09, 540, 0.22); } }
+
+  // Whoosh for the flying tiles: white noise through a band-pass filter
+  // that sweeps up then down, with a swell-and-fade envelope.
+  function playWhoosh() {
+    if (!ensureAudio()) return;
+    var ctx = audioCtx;
+    var t = ctx.currentTime;
+    var dur = 0.9;
+    var len = Math.max(1, Math.floor(ctx.sampleRate * dur));
+    var buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    var src = ctx.createBufferSource(); src.buffer = buf;
+    var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.1;
+    bp.frequency.setValueAtTime(320, t);
+    bp.frequency.exponentialRampToValueAtTime(2100, t + dur * 0.45);
+    bp.frequency.exponentialRampToValueAtTime(420, t + dur);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.exponentialRampToValueAtTime(0.45, t + dur * 0.35);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(bp); bp.connect(g); g.connect(ctx.destination);
+    src.start(t); src.stop(t + dur + 0.05);
+  }
 
   // Firecracker pop + crackle for the winner celebration.
   function playPop() {
@@ -823,6 +848,7 @@
 
     $('#screen-game').addEventListener('click', function (ev) {
       if (!session || !session.state) return;
+      if (flying) return; // tiles are mid-flight; ignore game taps
 
       var group = ev.target.closest('.tile-group');
       if (group && !group.disabled) {
@@ -846,7 +872,7 @@
       var lineEl = ev.target.closest('[data-dest-line]');
       if (lineEl && selection) {
         if (parseInt(lineEl.dataset.owner, 10) === session.state.currentPlayer) {
-          attemptMove(parseInt(lineEl.dataset.destLine, 10));
+          flyAndMove(parseInt(lineEl.dataset.destLine, 10), lineEl);
         }
         return;
       }
@@ -854,7 +880,7 @@
       var floorEl = ev.target.closest('[data-dest-floor]');
       if (floorEl && selection) {
         if (parseInt(floorEl.dataset.owner, 10) === session.state.currentPlayer) {
-          attemptMove('floor');
+          flyAndMove('floor', floorEl);
         }
       }
     });
@@ -880,6 +906,56 @@
       selection = null;
       goHome();
     });
+  }
+
+  // Fly the selected tiles around the screen and into the chosen row,
+  // THEN make the move: the tiles swoop up and across before landing
+  // (with a whoosh), and only then does the turn pass and the next
+  // player get announced.
+  function flyAndMove(dest, targetEl) {
+    if (flying || !selection) return;
+    var tiles = [];
+    document.querySelectorAll('#screen-game .tile-group.selected').forEach(function (g) {
+      g.querySelectorAll('.tile').forEach(function (t) { tiles.push(t); });
+    });
+    if (REDUCED_MOTION || !tiles.length || !targetEl || !tiles[0].animate) {
+      attemptMove(dest);
+      return;
+    }
+    flying = true;
+    playWhoosh();
+    var tr = targetEl.getBoundingClientRect();
+    var ex = dest === 'floor' ? tr.left + tr.width * 0.72 : tr.right - tr.height * 0.55;
+    var ey = tr.top + tr.height / 2;
+    var clones = [];
+    tiles.forEach(function (t, i) {
+      var r = t.getBoundingClientRect();
+      var clone = t.cloneNode(true);
+      clone.classList.add('fly-tile');
+      clone.style.left = r.left + 'px';
+      clone.style.top = r.top + 'px';
+      clone.style.width = r.width + 'px';
+      clone.style.height = r.height + 'px';
+      document.body.appendChild(clone);
+      clones.push(clone);
+      var sx = r.left + r.width / 2;
+      var sy = r.top + r.height / 2;
+      var endX = ex + (i - (tiles.length - 1) / 2) * 7;
+      var endY = ey + (i % 2 === 0 ? -3 : 3);
+      // The "around the screen" waypoint: high above both endpoints.
+      var wx = (sx + endX) / 2 + (i % 2 === 0 ? -50 : 50);
+      var wy = Math.min(sy, endY) - 180;
+      clone.animate([
+        { transform: 'translate(0px, 0px) rotate(0deg) scale(1)' },
+        { transform: 'translate(' + (wx - sx) + 'px, ' + (wy - sy) + 'px) rotate(30deg) scale(1.2)', offset: 0.48 },
+        { transform: 'translate(' + (endX - sx) + 'px, ' + (endY - sy) + 'px) rotate(0deg) scale(1)' }
+      ], { duration: 980, delay: i * 85, easing: 'cubic-bezier(.45, .05, .35, 1)', fill: 'forwards' });
+    });
+    setTimeout(function () {
+      clones.forEach(function (c) { c.remove(); });
+      flying = false;
+      attemptMove(dest);
+    }, 980 + (tiles.length - 1) * 85 + 70);
   }
 
   function attemptMove(dest) {
