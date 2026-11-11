@@ -340,7 +340,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 
 /* Turn change: incoming board slides in at the top with a gold glow; banner pulses. */
 @keyframes boardIn {
-  0% { transform: translateY(34px) scale(.96); opacity: 0; }
+  0% { transform: translateY(48px) scale(.94); opacity: 0; }
   60% { opacity: 1; }
   100% { transform: translateY(0) scale(1); opacity: 1; }
 }
@@ -349,13 +349,13 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
   30% { box-shadow: 0 0 0 3px rgba(230, 172, 0, .95), 0 0 44px rgba(230, 172, 0, .65), 0 10px 24px rgba(0, 0, 0, .5); }
   100% { box-shadow: 0 0 0 2px rgba(230, 172, 0, .65), 0 10px 24px rgba(0, 0, 0, .5); }
 }
-.board.turn-enter { animation: boardIn .55s ease both, turnGlow 1.3s ease both; }
+.board.turn-enter { animation: boardIn .85s cubic-bezier(.22, 1.25, .36, 1) both, turnGlow 1.8s ease both; }
 @keyframes bannerPulse {
   0% { transform: scale(1); }
-  30% { transform: scale(1.03); }
+  30% { transform: scale(1.035); }
   100% { transform: scale(1); }
 }
-.turn-banner.pulse { animation: bannerPulse .6s ease; }
+.turn-banner.pulse { animation: bannerPulse .9s ease; }
 .board-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
 .board-name { font-weight: 800; font-size: 1.05rem; }
 .board-name .you { color: #2f6fd0; font-size: .8rem; font-weight: 700; }
