@@ -548,18 +548,36 @@
   }
 
   // Factories show their 4 tiles as a strict 2x2 grid of individual tiles
-  // (in factory order) so nothing can spill outside the disc. Each tile is
-  // its own button, but it carries the same data-* contract as a color
-  // group: tapping any tile selects that color's whole group.
+  // so nothing can spill outside the disc. Each tile is its own button, but
+  // it carries the same data-* contract as a color group: tapping any tile
+  // selects that color's whole group. A color with 2+ tiles is aligned to
+  // the right column of the grid, and its count badge sits on that color's
+  // top-right tile.
   function factoryGridHtml(tiles, source) {
     var counts = {};
     tiles.forEach(function (t) { counts[t] = (counts[t] || 0) + 1; });
-    var seen = {};
-    return tiles.map(function (color) {
+    // Display order: colors grouped together, most-duplicated first, dealt
+    // into the right column first (cells 1, 3), then the left (0, 2).
+    var colorOrder = E.COLORS.filter(function (c) { return counts[c]; })
+      .sort(function (a, b) { return counts[b] - counts[a]; });
+    var sorted = [];
+    colorOrder.forEach(function (c) {
+      for (var i = 0; i < counts[c]; i++) sorted.push(c);
+    });
+    var posOrder = [1, 3, 0, 2];
+    var placed = [null, null, null, null];
+    sorted.forEach(function (color, k) { placed[posOrder[k]] = color; });
+    // Badge cell per color: its topmost cell, rightmost within that row.
+    var badgeAt = {};
+    placed.forEach(function (color, p) {
+      if (!color || counts[color] < 2) return;
+      var cur = badgeAt[color];
+      if (cur === undefined || (p >> 1) < (cur >> 1) ||
+          ((p >> 1) === (cur >> 1) && (p & 1) > (cur & 1))) badgeAt[color] = p;
+    });
+    return placed.map(function (color, p) {
       var sel = selection && selection.color === color &&
         selection.source.kind === 'factory' && selection.source.index === source.index;
-      var first = !seen[color];
-      seen[color] = true;
       return '<button type="button" class="tile-group factory-tile' +
         (canInteract() ? ' pickable' : '') + (sel ? ' selected' : '') + '"' +
         ' data-kind="factory" data-index="' + source.index + '"' +
@@ -567,7 +585,7 @@
         (canInteract() ? '' : ' disabled') +
         ' aria-label="' + counts[color] + ' ' + color + ' tiles">' +
         tileHtml(color, true) +
-        (first && counts[color] > 1 ? '<span class="group-count">' + counts[color] + '</span>' : '') +
+        (badgeAt[color] === p ? '<span class="group-count">' + counts[color] + '</span>' : '') +
         '</button>';
     }).join('');
   }

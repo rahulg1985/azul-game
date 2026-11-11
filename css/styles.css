@@ -362,6 +362,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
   padding: 3px;
   display: inline-flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 2px;
   max-width: calc(var(--tile-mini) * 2 + 14px);
   cursor: pointer;
