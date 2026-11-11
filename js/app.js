@@ -952,7 +952,7 @@
       '<span class="board-score">★ ' + p.score + '</span></span></div>' +
       '<div class="board-main"><div class="pattern-lines">' + lines + '</div>' +
       '<div class="wall">' + wall + '</div></div>' +
-      '<div class="floor-line"><div class="floor-label">Floor line</div>' +
+      '<div class="floor-line">' +
       '<div class="floor-slots' + (interact && selection ? ' droppable' : '') +
       '" data-owner="' + pi + '" data-dest-floor="1">' + floorSlots + '</div></div>' +
       '</div>';

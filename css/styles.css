@@ -547,7 +547,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 .wall-cell.just-placed { animation: pop .5s ease; }
 @keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
 
-.floor-line { margin-top: 10px; }
+.floor-line { margin-top: 4px; }
 .floor-label { font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: #5b6a85; margin-bottom: 3px; }
 .floor-slots { display: flex; gap: 4px; border-radius: 8px; padding: 2px; border: 2px solid transparent; width: 100%; }
 .floor-slots.droppable { border-color: rgba(47, 111, 208, .55); background: rgba(47, 111, 208, .10); cursor: pointer; }
