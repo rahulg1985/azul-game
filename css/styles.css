@@ -277,7 +277,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 .turn-banner {
   position: absolute;
   top: 8px;
-  left: 10px;
+  left: 34px;
   right: 10px;
   z-index: 20;
   display: flex;
@@ -312,13 +312,24 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 .score-chip.active b { color: #141414; }
 /* ----------------------------------------------------------------- table */
 .table-area { padding: 10px; position: relative; }
-.table-title {
-  margin: 2px 0 6px;
-  font-size: .78rem;
-  letter-spacing: .12em;
+/* Section labels run vertically down the left edge — a slim rail
+   instead of a full header row, so the sections keep the height. */
+.table-section { position: relative; padding-left: 24px; }
+.v-label {
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  transform: translateY(-50%) rotate(180deg);
+  writing-mode: vertical-rl;
+  font-size: .68rem;
+  letter-spacing: .2em;
   text-transform: uppercase;
   color: var(--ink-dim);
+  white-space: nowrap;
+  pointer-events: none;
 }
+.center-section { min-height: 94px; display: flex; }
+.center-section .center-pile { flex: 1; }
 .factories { display: flex; flex-wrap: wrap; gap: var(--board-gap); margin-bottom: 10px; padding: 42px 62px 0 0; }
 .factory {
   width: calc(var(--tile-mini) * 2 + 44px); height: calc(var(--tile-mini) * 2 + 44px);
