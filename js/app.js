@@ -94,6 +94,7 @@
   var lastTurnKey = null; // "round:currentPlayer" — drives the turn-change animation
   var voiceOptOut = false; // user tapped "Leave voice" in this room session
   var lastAnnouncedRound = null; // round-end pause/dictation handled up to this round
+  var startAnnouncedKey = null; // game-start announcement already spoken for this game
   var finalAnnouncedKey = null;  // score signature of the last announced game-over
   var roundOverlayTimer = null;
 
@@ -714,6 +715,21 @@
       lastAnnouncedRound = s.round;
       justEndedRound = true;
       roundEndPause(s);
+    }
+
+    // --- fresh game? announce the round and the first player once ---
+    if (s.phase === 'draft' && s.round === 1 &&
+        s.players.every(function (p) {
+          return p.floor.length === 0 &&
+            p.patternLines.every(function (l) { return l.length === 0; });
+        })) {
+      var gameKey = (session.mode === 'online' ? session.code : 'local') + '|' +
+        s.players.map(function (p) { return p.name; }).join(',') + '|' +
+        (s.bag || []).slice(0, 12).join(',');
+      if (startAnnouncedKey !== gameKey) {
+        startAnnouncedKey = gameKey;
+        speakAloud('Round 1 started. ' + s.players[s.currentPlayer].name + '’s turn now');
+      }
     }
 
     // --- boards: turn player first (full size), then the rest ---
