@@ -873,25 +873,28 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 }
 
 /* ------------------------------------------------- landscape phones ----- */
+/* Landscape phones follow the DESKTOP responsive design (v74, user
+   request): factories in one row across the top, boards in a
+   two-column grid — 2x2 for 3–4 players. This replaces the old
+   side-by-side page grid (factories in a left column, boards in a
+   scrolling right column). Tiles shrink so two boards fit side by
+   side; factory discs shrink just enough that even 9 factories
+   (4 players) stay on one row. The page scrolls vertically, exactly
+   like a short desktop window. */
 @media (orientation: landscape) and (max-height: 540px) {
   #screen-game {
-    /* Boards get ~58% of the width — shrink tiles to fit that column. */
-    --tile-size: clamp(18px, calc((100vw * .58 - 96px) / 10), 40px);
-    display: grid;
-    grid-template-columns: minmax(0, 42fr) minmax(0, 58fr);
-    grid-template-areas:
-      "banner banner"
-      "voice voice"
-      "table boards"
-      "actions actions";
-    gap: var(--board-gap);
-    align-items: start;
+    --tile-size: clamp(16px, calc((100vw / 2 - 92px) / 10), 34px);
+    --tile-mini: clamp(12px, calc((100vw - 330px) / 18), 30px);
   }
-  #screen-game #turn-banner { grid-area: banner; margin-bottom: 0; }
-  #screen-game .voice-box { grid-area: voice; margin-bottom: 0; }
-  #screen-game .table-area { grid-area: table; margin-bottom: 0; }
-  #screen-game #boards { grid-area: boards; overflow-y: auto; max-height: calc(100dvh - 170px); }
-  #screen-game .game-actions { grid-area: actions; margin-top: 0; }
+  .factories { flex-wrap: nowrap; }
+  .factory {
+    width: calc(var(--tile-mini) * 2 + 26px);
+    height: calc(var(--tile-mini) * 2 + 26px);
+    flex: none;
+  }
+  .boards { grid-template-columns: 1fr 1fr; }
+  .board { max-width: none; margin-inline: 0; }
+  .board.turn { grid-column: auto; }
 }
 
 /* ------------------------------------------------------- small phones --- */
