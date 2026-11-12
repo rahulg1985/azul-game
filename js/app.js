@@ -150,9 +150,22 @@
   //   mode: 'local' | 'online',
   //   state: <engine state>,
   //   // online only:
-  //   code, playerIdx, myName, unwatch
+  //   code, playerIdx, myName, unwatch,
+  //   // mySeats: every seat this device plays — [playerIdx] normally;
+  //   // in a Local+Online room the host device owns seats 0..localCount-1.
+  //   mySeats
   // }
   var session = null;
+
+  // Does this device play seat i? Single source for every turn check,
+  // so Local+Online seats behave exactly like "my" seat everywhere.
+  function ownsSeat(i) {
+    if (!session) return false;
+    if (session.mySeats && session.mySeats.length) {
+      return session.mySeats.indexOf(i) !== -1;
+    }
+    return i === session.playerIdx;
+  }
   var selection = null; // { source: {kind, index?}, color }
   var remoteSel = null; // another player's live selection (online): {by, kind, index, color}
   var remoteReplay = null; // a remote move being replayed here: {id, by, landed, stash, timer}
@@ -429,9 +442,11 @@
     var chooser = $('#home-chooser');
     var local = $('#setup-local');
     var online = $('#setup-online');
+    var hybrid = $('#setup-hybrid');
     if (chooser) chooser.classList.toggle('hidden', !!which);
     if (local) local.classList.toggle('hidden', which !== 'local');
     if (online) online.classList.toggle('hidden', which !== 'online');
+    if (hybrid) hybrid.classList.toggle('hidden', which !== 'hybrid');
     // While a setup form is open, hide the logo header entirely and put
     // the form at the very top — otherwise the phone keyboard pushes the
     // name fields around and they have to be scrolled into view by hand.
@@ -442,6 +457,7 @@
   function wireHome() {
     $('#btn-mode-local').addEventListener('click', function () { showHomeSetup('local'); });
     $('#btn-mode-online').addEventListener('click', function () { showHomeSetup('online'); });
+    $('#btn-mode-hybrid').addEventListener('click', function () { showHomeSetup('hybrid'); });
     document.querySelectorAll('.btn-back').forEach(function (b) {
       b.addEventListener('click', function () { showHomeSetup(null); });
     });
@@ -477,10 +493,50 @@
       startLocalGame(names);
     });
 
+    // Local+Online setup: 2 or 3 players on this device.
+    setHybridCount(hybridCount);
+    $('#hybrid-count').addEventListener('click', function (ev) {
+      var btn = ev.target.closest('button[data-count]');
+      if (!btn) return;
+      setHybridCount(parseInt(btn.dataset.count, 10));
+    });
+    $('#btn-create-hybrid').addEventListener('click', function () { enterFullscreen(); createHybridRoomFlow(this); });
+
     $('#btn-create-room').addEventListener('click', function () { enterFullscreen(); createRoomFlow(this); });
     $('#btn-join-room').addEventListener('click', function () { enterFullscreen(); joinRoomFlow(this); });
     $('#join-code').addEventListener('keydown', function (ev) {
       if (ev.key === 'Enter') joinRoomFlow($('#btn-join-room'));
+    });
+  }
+
+  var hybridCount = 2;
+
+  function setHybridCount(n) {
+    hybridCount = Math.max(2, Math.min(3, n));
+    document.querySelectorAll('.hybrid-row').forEach(function (row, i) {
+      row.classList.toggle('hidden', i >= hybridCount);
+    });
+    var picker = $('#hybrid-count');
+    if (picker) {
+      picker.querySelectorAll('button').forEach(function (b) {
+        b.classList.toggle('active', parseInt(b.dataset.count, 10) === hybridCount);
+      });
+    }
+  }
+
+  function createHybridRoomFlow(btn) {
+    var names = [];
+    document.querySelectorAll('.hybrid-name').forEach(function (input, i) {
+      if (i < hybridCount) names.push(input.value.trim() || ('Player ' + (i + 1)));
+    });
+    rememberName(names[0]);
+    busy(btn, function () {
+      return ensureOnline().then(function (ready) {
+        if (!ready) return;
+        return window.AzulOnline.createHybridRoom(names).then(function (res) {
+          enterRoom(res.code, res.playerIdx, names[0], res.playerIdxs);
+        });
+      }).catch(function (err) { toast(err.message, true); });
     });
   }
 
@@ -565,7 +621,7 @@
     });
   }
 
-  function enterRoom(code, playerIdx, myName) {
+  function enterRoom(code, playerIdx, myName, mySeats) {
     leaveRoomWatch();
     session = {
       mode: 'online',
@@ -573,6 +629,7 @@
       code: code,
       playerIdx: playerIdx,
       myName: myName,
+      mySeats: mySeats || [playerIdx],
       unwatch: null
     };
     // Per-tab session restore: a reload of THIS tab rejoins the room.
@@ -629,11 +686,11 @@
   function handleLive(room) {
     var live = room.live || {};
     var sel = live.sel || null;
-    remoteSel = (sel && sel.by !== session.playerIdx)
+    remoteSel = (sel && !ownsSeat(sel.by))
       ? { by: sel.by, kind: sel.kind, index: sel.index, color: sel.color }
       : null;
     var mv = live.move || null;
-    if (!mv || mv.by === session.playerIdx || mv.id === lastRemoteMoveId) return;
+    if (!mv || ownsSeat(mv.by) || mv.id === lastRemoteMoveId) return;
     if (!session.state || session.state.phase !== 'draft') return;
     if (mv.by !== session.state.currentPlayer) return;
     if (remoteReplay || flying) return;
@@ -708,6 +765,21 @@
       }
     }
 
+    // Local+Online: the host device owns seats 0..localCount-1. A
+    // rejoin (or a lobby seat shift) re-derives ownership from the
+    // room meta, so a refreshed host tab gets all its seats back.
+    var meta = room.meta || {};
+    if (meta.mode === 'hybrid') {
+      var lc = meta.localCount || 1;
+      if (session.playerIdx < lc) {
+        var seats = [];
+        for (var si = 0; si < lc; si++) seats.push(si);
+        session.mySeats = seats;
+      } else {
+        session.mySeats = [session.playerIdx];
+      }
+    }
+
     if (room.meta.status === 'lobby' || !room.state) {
       renderLobby(room);
       show('screen-lobby');
@@ -748,12 +820,14 @@
       enterCelebration();
       return;
     }
-    if (selection && session.state.currentPlayer !== session.playerIdx) selection = null;
+    if (selection && !ownsSeat(session.state.currentPlayer)) selection = null;
     show('screen-game');
     renderGame();
-    if (prev && prev.currentPlayer !== session.playerIdx &&
-        session.state.currentPlayer === session.playerIdx) {
-      toast('Your turn, ' + session.myName + '!');
+    if (prev && !ownsSeat(prev.currentPlayer) &&
+        ownsSeat(session.state.currentPlayer)) {
+      toast(session.mySeats && session.mySeats.length > 1
+        ? session.state.players[session.state.currentPlayer].name + '’s turn — this device!'
+        : 'Your turn, ' + session.myName + '!');
     }
   }
 
@@ -767,12 +841,22 @@
     $('#lobby-code').textContent = session.code;
     $('#invite-link').value = inviteLink(session.code);
     $('#lobby-count').textContent = '(' + players.length + '/4)';
-    $('#lobby-players').innerHTML = players.map(function (name, i) {
+    var isHybrid = room.meta.mode === 'hybrid';
+    var listHtml = players.map(function (name, i) {
       var tags = '';
       if (i === room.meta.hostIdx) tags += '<span class="tag">Host</span>';
       if (i === session.playerIdx) tags += '<span class="tag me">You</span>';
+      else if (isHybrid && session.mySeats && session.mySeats.indexOf(i) !== -1) {
+        tags += '<span class="tag device">This device</span>';
+      }
       return '<li>' + esc(name) + '<span>' + tags + '</span></li>';
     }).join('');
+    if (isHybrid && room.meta.status === 'lobby') {
+      for (var oi = players.length; oi < 4; oi++) {
+        listHtml += '<li class="open">Open seat<span><span class="tag">Waiting…</span></span></li>';
+      }
+    }
+    $('#lobby-players').innerHTML = listHtml;
 
     var startBtn = $('#btn-start-online');
     if (isHost) {
@@ -780,7 +864,9 @@
       startBtn.disabled = players.length < 2;
       $('#lobby-status').textContent = players.length < 2
         ? 'Waiting for at least one more player to join…'
-        : 'Everyone in? Tap Start when ready — players can’t join once the game begins.';
+        : (isHybrid && players.length < 4
+          ? 'Friends can still join with the link — or tap Start to play with ' + players.length + ' players.'
+          : 'Everyone in? Tap Start when ready — players can’t join once the game begins.');
     } else {
       startBtn.classList.add('hidden');
       $('#lobby-status').textContent = 'Waiting for the host to start the game…';
@@ -817,9 +903,16 @@
     $('#btn-leave-room').addEventListener('click', function () {
       var code = session.code;
       var idx = session.playerIdx;
+      var multiSeat = session.mySeats && session.mySeats.length > 1;
       leaveRoomWatch();
       if (window.AzulOnline.isReady()) {
-        window.AzulOnline.leaveRoom(code, idx).catch(function () { /* ignore */ });
+        if (multiSeat && window.AzulOnline.deleteRoom) {
+          // Host device of a Local+Online room: all its seats leave
+          // together, which ends the room for everyone.
+          window.AzulOnline.deleteRoom(code).catch(function () { /* ignore */ });
+        } else {
+          window.AzulOnline.leaveRoom(code, idx).catch(function () { /* ignore */ });
+        }
       }
       session = null;
       goHome();
@@ -830,7 +923,7 @@
   function canInteract() {
     if (!session || !session.state || session.state.phase !== 'draft') return false;
     if (session.mode === 'local') return true;
-    return session.state.currentPlayer === session.playerIdx;
+    return ownsSeat(session.state.currentPlayer);
   }
 
   // The selection the board painters show: my own while I am deciding,
@@ -939,9 +1032,12 @@
     if (s.phase === 'finished') {
       main = 'Game finished';
       sub = '';
-    } else if (session.mode === 'online' && s.currentPlayer !== session.playerIdx) {
+    } else if (session.mode === 'online' && !ownsSeat(s.currentPlayer)) {
       main = 'Round ' + s.round + ' — ' + cur.name + '’s turn';
       sub = 'Waiting for ' + cur.name + ' to make a move…';
+    } else if (session.mode === 'online' && session.mySeats && session.mySeats.length > 1) {
+      main = 'Round ' + s.round + ' — ' + cur.name + '’s turn';
+      sub = 'This device — pass to ' + cur.name + ' and play their turn.';
     } else if (session.mode === 'online') {
       main = 'Round ' + s.round + ' — your turn!';
       sub = 'Draft tiles from a factory or the center, then place them on a line.';
@@ -1202,8 +1298,12 @@
         E.FLOOR_PENALTIES[k] + '</span><span class="floor-cell">' + cell + '</span></span>';
     }
 
-    var youTag = session.mode === 'online' && pi === session.playerIdx
-      ? ' <span class="you">(you)</span>' : '';
+    var youTag = '';
+    if (session.mode === 'online' && ownsSeat(pi)) {
+      youTag = pi === session.playerIdx
+        ? ' <span class="you">(you)</span>'
+        : ' <span class="you">(this device)</span>';
+    }
 
     var resolve = s.lastResolve && s.lastResolve[pi];
     var roundChip = '';
@@ -1267,7 +1367,7 @@
         renderGame();
         if (session.mode === 'online' && window.AzulOnline.setLiveSelection) {
           window.AzulOnline.setLiveSelection(session.code, selection ? {
-            by: session.playerIdx,
+            by: session.state.currentPlayer,
             kind: selection.source.kind,
             index: selection.source.kind === 'factory' ? selection.source.index : 0,
             color: selection.color
@@ -1329,12 +1429,12 @@
       // the turn only after it lands. The selection is consumed.
       if (window.AzulOnline.setLiveMove) {
         window.AzulOnline.setLiveMove(session.code, {
-          by: session.playerIdx,
+          by: session.state.currentPlayer,
           kind: sel.source.kind,
           index: sel.source.kind === 'factory' ? sel.source.index : 0,
           color: sel.color,
           dest: dest,
-          id: Date.now() + ':' + session.playerIdx
+          id: Date.now() + ':' + session.state.currentPlayer
         });
       }
       if (window.AzulOnline.setLiveSelection) {
@@ -1516,7 +1616,7 @@
     }
 
     // Online: the move runs inside a transaction on the shared state.
-    window.AzulOnline.submitMove(session.code, session.playerIdx, move)
+    window.AzulOnline.submitMove(session.code, session.state.currentPlayer, move)
       .then(function (newState) {
         selection = null;
         if (newState) {

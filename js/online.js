@@ -9,7 +9,11 @@
  *
  * Room shape in RTDB:
  *   rooms/{code} = {
- *     meta:    { hostIdx: 0, status: 'lobby'|'playing'|'finished', createdAt },
+ *     meta:    { hostIdx: 0, status: 'lobby'|'playing'|'finished', createdAt,
+ *                // Local+Online rooms add:
+ *                mode: 'hybrid', localCount: 2|3 }
+ *              // In a hybrid room, seats 0..localCount-1 all belong to
+ *              // the host's device; later seats are one per guest device.
  *     players: ['Name', ...],                 // seat order; index = playerIdx
  *     state:   <AzulEngine state JSON | null> // null while in the lobby
  *     live:    { sel, move }                  // ephemeral play-by-play:
@@ -193,6 +197,44 @@
     return { code: code, playerIdx: myIdx };
   }
 
+  // Local+Online: the host device seats 2–3 named players at once.
+  // They occupy seats 0..names.length-1; guests join one seat each via
+  // joinRoom afterwards (the 4-player cap there applies as usual).
+  async function createHybridRoom(names) {
+    for (var attempt = 0; attempt < 8; attempt++) {
+      var code = makeCode();
+      var ref = roomRef(code);
+      var snap = await ref.once('value');
+      if (snap.exists()) continue; // code collision — try another
+      await ref.set({
+        meta: {
+          hostIdx: 0,
+          status: 'lobby',
+          createdAt: window.firebase.database.ServerValue.TIMESTAMP,
+          mode: 'hybrid',
+          localCount: names.length
+        },
+        players: names.slice(),
+        state: null
+      });
+      saveSeat(code, names[0], 0);
+      var idxs = names.map(function (_, i) { return i; });
+      return { code: code, playerIdx: 0, playerIdxs: idxs };
+    }
+    throw new Error('Could not create a room — please try again.');
+  }
+
+  // The host device leaving a hybrid lobby takes all its local seats
+  // with it — without them the room can't be played, so it is deleted
+  // and the guests see the usual "room no longer exists" path.
+  async function deleteRoom(code) {
+    try {
+      await roomRef(code).remove();
+    } finally {
+      forgetSeat(code);
+    }
+  }
+
   // Subscribe to a room. cb(roomObject | null). Returns an unsubscribe fn.
   function watchRoom(code, cb) {
     var ref = roomRef(code);
@@ -307,6 +349,8 @@
     init: init,
     isReady: isReady,
     createRoom: createRoom,
+    createHybridRoom: createHybridRoom,
+    deleteRoom: deleteRoom,
     joinRoom: joinRoom,
     watchRoom: watchRoom,
     startGame: startGame,
