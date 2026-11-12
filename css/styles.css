@@ -586,9 +586,26 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
    players side by side, 3–4 in 2×2), tiles shrunk until the whole set
    fits one screen. Scoped to #boards so the factories keep their size;
    flights still land exactly because they measure live positions. */
-#boards.overview { grid-template-columns: 1fr 1fr; --tile-size: clamp(10px, calc((100vw - 130px) / 20), 24px); }
-#boards.overview .board { padding: 6px; }
-#boards.overview .board-name { font-size: .85rem; }
+#boards.overview { grid-template-columns: 1fr 1fr; gap: 6px; --tile-size: clamp(10px, calc((100vw - 130px) / 20), 24px); }
+#boards.overview .board { padding: 3px; min-width: 0; }
+#boards.overview .board-name { font-size: .8rem; }
+/* Compact board insides in overview (v75, user request): with the
+   normal padding/gaps a board is ~10 tiles + 85px wide, so two of
+   them overflowed a phone screen and needed horizontal scrolling.
+   Overview trims every inside space — board padding, pattern/wall
+   gaps, the pattern arrow gap, floor slots — down to ~47px of
+   overhead per board, so two boards fit fully on one screen. */
+#boards.overview .board-head { margin-bottom: 2px; }
+#boards.overview .board-main { gap: 4px; }
+#boards.overview .pattern-lines { gap: 2px; padding-right: 4px; padding-top: 2px; }
+#boards.overview .pline { gap: 2px; padding: 0 1px; }
+#boards.overview .pline::after { right: -5px; border-left-width: 5px; border-top-width: 4px; border-bottom-width: 4px; }
+#boards.overview .wall { gap: 2px; padding: 3px; }
+#boards.overview .floor-line { margin-top: 1px; }
+#boards.overview .floor-slots { gap: 2px; padding: 1px; }
+#boards.overview .floor-slot { padding: 1px 1px 2px; }
+#boards.overview .floor-pen { height: 13px; line-height: 13px; font-size: .68rem; margin-bottom: 1px; }
+#boards.overview .round-chip { font-size: .66rem; padding: 1px 6px; }
 @media (min-width: 769px) and (orientation: landscape) {
   #boards.overview { --tile-size: clamp(12px, calc((100vw - 200px) / 40), 22px); }
 }
