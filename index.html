@@ -6,14 +6,14 @@
 <title>Azul — Tile Game</title>
 <meta name="description" content="Azul tile game — play locally with friends on one device, or online by sharing a room link.">
 <meta name="theme-color" content="#0b1220">
-<meta name="azul-build" content="71">
+<meta name="azul-build" content="72">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Azul">
 <link rel="apple-touch-icon" href="assets/logo.jpg">
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="css/styles.css?v=71">
+<link rel="stylesheet" href="css/styles.css?v=72">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%232f6fd0'/><rect x='26' y='26' width='48' height='48' rx='8' transform='rotate(45 50 50)' fill='%23f5f1e6'/></svg>">
 </head>
 <body>
@@ -205,6 +205,8 @@
 
     <div id="boards" class="boards"></div>
 
+    <button type="button" id="btn-zoom" class="zoom-btn hidden" aria-label="Zoom out — see all boards"></button>
+
     <div class="voice-box">
       <div class="voice-head">🎙️ Voice chat <span class="voice-status"></span></div>
       <div class="voice-members"></div>
@@ -281,10 +283,10 @@
   </div>
 </div>
 
-<script src="js/engine.js?v=71"></script>
+<script src="js/engine.js?v=72"></script>
 <!-- js/config.js is an ES module; js/online.js imports it on demand. -->
-<script src="js/online.js?v=71"></script>
-<script src="js/voice.js?v=71"></script>
-<script src="js/app.js?v=71"></script>
+<script src="js/online.js?v=72"></script>
+<script src="js/voice.js?v=72"></script>
+<script src="js/app.js?v=72"></script>
 </body>
 </html>

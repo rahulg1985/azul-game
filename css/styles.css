@@ -582,6 +582,35 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 }
 .floor-cell .tile { width: min(100%, calc(var(--tile) * 1.25)); height: auto; aspect-ratio: 1 / 1; }
 
+/* Zoomed-out overview: every board in one grid, in seat order (2
+   players side by side, 3–4 in 2×2), tiles shrunk until the whole set
+   fits one screen. Scoped to #boards so the factories keep their size;
+   flights still land exactly because they measure live positions. */
+#boards.overview { grid-template-columns: 1fr 1fr; --tile-size: clamp(10px, calc((100vw - 130px) / 20), 24px); }
+#boards.overview .board { padding: 6px; }
+#boards.overview .board-name { font-size: .85rem; }
+@media (min-width: 769px) and (orientation: landscape) {
+  #boards.overview { --tile-size: clamp(12px, calc((100vw - 200px) / 40), 22px); }
+}
+/* Floating zoom button: fixed over the boards' corner, takes no
+   layout space, re-anchored by JS just above the first board's score.
+   Below the toast (50), round card (60) and celebration (66). */
+.zoom-btn {
+  position: fixed;
+  top: 120px; left: auto;
+  z-index: 45;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: rgba(10, 18, 32, .8);
+  color: #fff;
+  border: 1.5px solid rgba(255, 255, 255, .35);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; cursor: pointer;
+}
+.zoom-btn svg { width: 22px; height: 22px; }
+.zoom-btn.hidden { display: none; }
+
 /* Compact opponent boards */
 /* Opponent boards render in full, at the same size as the active board,
    so the whole screen is used. */

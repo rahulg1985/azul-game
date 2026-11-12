@@ -180,6 +180,7 @@
   var startAnnouncedKey = null; // game-start announcement already spoken for this game
   var finalAnnouncedKey = null;  // score signature of the last announced game-over
   var celebrating = false;       // winner celebration overlay is showing
+  var overviewOn = false;        // zoomed-out all-boards view (game screen)
   var roundOverlayTimer = null;
 
   // ---------------------------------------------------------- sound & voice --
@@ -1118,11 +1119,13 @@
       };
     });
     var order = s.players.map(function (_, i) { return i; });
-    order.sort(function (a, b) {
-      if (a === s.currentPlayer) return -1;
-      if (b === s.currentPlayer) return 1;
-      return a - b;
-    });
+    if (!overviewOn) {
+      order.sort(function (a, b) {
+        if (a === s.currentPlayer) return -1;
+        if (b === s.currentPlayer) return 1;
+        return a - b;
+      });
+    }
     boardsEl.innerHTML = order.map(function (pi) {
       return boardHtml(s, pi);
     }).join('');
@@ -1139,7 +1142,13 @@
       if (keyParts.length === 3) prevPlayer = parseInt(keyParts[1], 10);
     }
     lastTurnKey = turnKey;
-    if (turnChanged) {
+    if (turnChanged && overviewOn) {
+      // Overview shows every board already — no circle switch. Keep
+      // the same landing bookkeeping and announcement, minus motion.
+      holdNextSwitch = false;
+      flying = false;
+      if (!justEndedRound) speakTurn(cur.name);
+    } else if (turnChanged) {
       var bannerEl = $('#turn-banner');
       bannerEl.classList.add('pulse');
       bannerEl.scrollIntoView({ block: 'start' });
@@ -1250,6 +1259,7 @@
       flying = false;
     }
     renderVoice();
+    placeZoomButton();
   }
 
   function boardHtml(s, pi) {
@@ -1392,6 +1402,24 @@
       }
     });
 
+    var zoomBtn = $('#btn-zoom');
+    if (zoomBtn) {
+      zoomBtn.addEventListener('click', function () {
+        if (flying) return; // never re-layout mid-flight
+        setOverview(!overviewOn);
+      });
+    }
+    window.addEventListener('resize', function () { placeZoomButton(); });
+    window.addEventListener('scroll', function () {
+      if (!zoomBtn || zoomBtn.classList.contains('hidden')) return;
+      if (zoomScrollQueued) return;
+      zoomScrollQueued = true;
+      requestAnimationFrame(function () {
+        zoomScrollQueued = false;
+        placeZoomButton();
+      });
+    }, { passive: true });
+
     $('#btn-sound').addEventListener('click', function () {
       setSound(!soundOn);
       if (soundOn) playPickup();
@@ -1411,8 +1439,57 @@
       }
       session = null;
       selection = null;
+      overviewOn = false;
+      var boardsElQ = $('#boards');
+      if (boardsElQ) boardsElQ.classList.remove('overview');
       goHome();
     });
+  }
+
+  // ---------------------------------------------------------- zoom view --
+  // A floating magnifying-glass button hovers over the boards (fixed
+  // position, no layout space of its own), anchored just above the
+  // first board's score. Zooming out is a pure view change: the boards
+  // shrink into one grid in seat order. Flights keep landing on the
+  // right slots because flyTilesForMove measures live positions.
+  var ICON_ZOOM_OUT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><line x1="15.5" y1="15.5" x2="21" y2="21"></line><line x1="7.5" y1="10.5" x2="13.5" y2="10.5"></line></svg>';
+  var ICON_ZOOM_IN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><line x1="15.5" y1="15.5" x2="21" y2="21"></line><line x1="7.5" y1="10.5" x2="13.5" y2="10.5"></line><line x1="10.5" y1="7.5" x2="10.5" y2="13.5"></line></svg>';
+  var zoomScrollQueued = false;
+
+  function setOverview(on) {
+    overviewOn = !!on;
+    var boardsEl = $('#boards');
+    if (boardsEl) boardsEl.classList.toggle('overview', overviewOn);
+    if (session && session.state) renderGame(); // re-render in the new scale/order
+    placeZoomButton();
+  }
+
+  function placeZoomButton() {
+    var btn = $('#btn-zoom');
+    if (!btn) return;
+    var inGame = session && session.state &&
+      !$('#screen-game').classList.contains('hidden');
+    if (!inGame) { btn.classList.add('hidden'); return; }
+    var boards = document.querySelectorAll('#boards .board');
+    if (!boards.length) { btn.classList.add('hidden'); return; }
+    // Show the button only when the boards cannot all be seen at once
+    // (stacked phone/portrait layouts) — or while zoomed out, so the
+    // way back is always there.
+    var first = boards[0].getBoundingClientRect();
+    var last = boards[boards.length - 1].getBoundingClientRect();
+    var stackHeight = (last.bottom + window.scrollY) - (first.top + window.scrollY);
+    var needed = overviewOn || stackHeight > window.innerHeight * 0.85;
+    btn.classList.toggle('hidden', !needed);
+    if (!needed) return;
+    btn.innerHTML = overviewOn ? ICON_ZOOM_IN : ICON_ZOOM_OUT;
+    btn.setAttribute('aria-label', overviewOn
+      ? 'Zoom in — back to normal view' : 'Zoom out — see all boards');
+    if (flying) return; // mid-flight/switch the boards are displaced — don't chase them
+    // Anchor: just above the first board's score, right-aligned with it.
+    var score = boards[0].querySelector('.board-score');
+    var r = score ? score.getBoundingClientRect() : first;
+    btn.style.top = Math.max(4, r.top - 46) + 'px';
+    btn.style.left = Math.max(4, r.right - 40) + 'px';
   }
 
   // Fly the selected tiles in a slow circular arc — down and to the
