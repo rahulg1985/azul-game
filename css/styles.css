@@ -609,9 +609,10 @@ input[type="text"]:focus { outline: 2px solid var(--accent-2); border-color: tra
 @media (min-width: 769px) and (orientation: landscape) {
   #boards.overview { --tile-size: clamp(12px, calc((100vw - 200px) / 40), 22px); }
 }
-/* Floating zoom button: fixed over the boards' corner, takes no
-   layout space, re-anchored by JS just above the first board's score.
-   Below the toast (50), round card (60) and celebration (66). */
+/* Floating zoom button: fixed, takes no layout space; JS anchors it
+   to the table card's bottom-right corner so it never moves between
+   the normal and zoomed-out views. Below the toast (50), round card
+   (60) and celebration (66). */
 .zoom-btn {
   position: fixed;
   top: 120px; left: auto;

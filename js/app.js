@@ -1448,8 +1448,9 @@
 
   // ---------------------------------------------------------- zoom view --
   // A floating magnifying-glass button hovers over the boards (fixed
-  // position, no layout space of its own), anchored just above the
-  // first board's score. Zooming out is a pure view change: the boards
+  // position, no layout space of its own), anchored to the table
+  // card's bottom-right corner — the same spot in both views (v76).
+  // Zooming out is a pure view change: the boards
   // shrink into one grid in seat order. Flights keep landing on the
   // right slots because flyTilesForMove measures live positions.
   var ICON_ZOOM_OUT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><line x1="15.5" y1="15.5" x2="21" y2="21"></line><line x1="7.5" y1="10.5" x2="13.5" y2="10.5"></line></svg>';
@@ -1482,11 +1483,16 @@
     btn.setAttribute('aria-label', overviewOn
       ? 'Zoom in — back to normal view' : 'Zoom out — see all boards');
     if (flying) return; // mid-flight/switch the boards are displaced — don't chase them
-    // Anchor: just above the first board's score, right-aligned with it.
-    var score = boards[0].querySelector('.board-score');
-    var r = score ? score.getBoundingClientRect() : first;
-    btn.style.top = Math.max(4, r.top - 46) + 'px';
-    btn.style.left = Math.max(4, r.right - 40) + 'px';
+    // Anchor (v76, user-marked spot): the bottom-right corner of the
+    // table card (factories/center), centred on its bottom edge —
+    // the factories area is identical in both views, so the button
+    // sits in exactly the same place whether zoomed in or out.
+    // (v73–v75 anchored it to the first board's score, which moved
+    // between views because the boards change size and order.)
+    var table = document.querySelector('.table-area');
+    var r = table ? table.getBoundingClientRect() : first;
+    btn.style.top = Math.max(4, r.bottom - 20) + 'px';
+    btn.style.left = Math.max(4, r.right - 50) + 'px';
   }
 
   // Fly the selected tiles in a slow circular arc — down and to the
