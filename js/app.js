@@ -1472,15 +1472,12 @@
     if (!inGame) { btn.classList.add('hidden'); return; }
     var boards = document.querySelectorAll('#boards .board');
     if (!boards.length) { btn.classList.add('hidden'); return; }
-    // Show the button only when the boards cannot all be seen at once
-    // (stacked phone/portrait layouts) — or while zoomed out, so the
-    // way back is always there.
+    // Always visible while a game is on screen (v73). v72 only
+    // showed it when the boards overflowed the screen, so in a
+    // 2-player local game — where both boards happen to fit — the
+    // button never appeared and the feature could not be found.
     var first = boards[0].getBoundingClientRect();
-    var last = boards[boards.length - 1].getBoundingClientRect();
-    var stackHeight = (last.bottom + window.scrollY) - (first.top + window.scrollY);
-    var needed = overviewOn || stackHeight > window.innerHeight * 0.85;
-    btn.classList.toggle('hidden', !needed);
-    if (!needed) return;
+    btn.classList.remove('hidden');
     btn.innerHTML = overviewOn ? ICON_ZOOM_IN : ICON_ZOOM_OUT;
     btn.setAttribute('aria-label', overviewOn
       ? 'Zoom in — back to normal view' : 'Zoom out — see all boards');
