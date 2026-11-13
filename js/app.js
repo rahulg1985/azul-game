@@ -176,6 +176,7 @@
   var highlight = {};   // "playerIdx:row:col" -> true for just-tiled cells
   var lastTurnKey = null; // "round:currentPlayer" — drives the turn-change animation
   var voiceOptOut = false; // user tapped "Leave voice" in this room session
+  var voiceLockCut = false; // voice auto-disconnected for privacy (screen off / app hidden); reconnect is manual only
   var lastAnnouncedRound = null; // round-end pause/dictation handled up to this round
   var startAnnouncedKey = null; // game-start announcement already spoken for this game
   var finalAnnouncedKey = null;  // score signature of the last announced game-over
@@ -652,6 +653,7 @@
     show('screen-lobby');
     resetLiveState();
     voiceOptOut = false;
+    voiceLockCut = false;
     startVoiceAuto(); // voice chat is on by default in online rooms
   }
 
@@ -664,6 +666,7 @@
 
   function leaveRoomWatch() {
     resetLiveState();
+    voiceLockCut = false;
     if (window.AzulVoice) window.AzulVoice.leave();
     dismissRoundOverlay();
     stopCelebration();
@@ -1748,7 +1751,7 @@
   // time). "Leave voice" opts out for the rest of that room session.
   function startVoiceAuto() {
     var V = window.AzulVoice;
-    if (!V || !session || session.mode !== 'online' || voiceOptOut) {
+    if (!V || !session || session.mode !== 'online' || voiceOptOut || voiceLockCut) {
       renderVoice();
       return;
     }
@@ -1758,6 +1761,32 @@
     });
     renderVoice();
   }
+
+  // ----------------------------------------------------- voice privacy --
+  // If the screen turns off or the app goes to the background while
+  // voice chat is live, tear voice down COMPLETELY — AzulVoice.leave()
+  // stops the mic tracks, closes every peer connection and removes this
+  // player's voice presence, so the other players see them leave voice.
+  // Coming back does NOT rejoin: reconnecting is a manual tap on the
+  // "Reconnect Voice Chat" button (renderVoice shows it while
+  // voiceLockCut is set, and startVoiceAuto refuses to auto-join).
+  // A live mic on a locked phone in a pocket is a privacy breach.
+  function disconnectVoiceForPrivacy() {
+    var V = window.AzulVoice;
+    if (!V || !session || session.mode !== 'online') return;
+    if (voiceOptOut || voiceLockCut) return;
+    var snap = V.snapshot();
+    if (!snap.active && !snap.joining) return;
+    V.leave();
+    voiceLockCut = true;
+    alog('Voice chat disconnected: screen off / app hidden — manual reconnect required (privacy).');
+    renderVoice();
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) disconnectVoiceForPrivacy();
+  });
+  window.addEventListener('pagehide', disconnectVoiceForPrivacy);
+  document.addEventListener('freeze', disconnectVoiceForPrivacy);
 
   // WhatsApp-style call icons (inline SVG, stroke style, 24x24).
   var ICON_MIC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3" fill="currentColor" stroke="none"></rect><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"></path><path d="M12 18v3.5"></path></svg>';
@@ -1780,9 +1809,11 @@
       var controls = box.querySelector('.voice-controls');
       if (status) {
         status.textContent = snap.joining ? '· Connecting…'
-          : snap.blocked ? '· Mic blocked'
+          : snap.active && snap.blocked ? '· Mic blocked'
           : snap.active && snap.hasMic ? '· On'
           : snap.active ? '· Connecting…'
+          : voiceLockCut ? '· Disconnected — screen was off'
+          : snap.blocked ? '· Mic blocked'
           : '· Off';
       }
       if (members) {
@@ -1826,9 +1857,11 @@
             '<button type="button" class="vbtn vbtn-enable" disabled>' +
             ICON_CALL + '<span>Connecting…</span></button>';
         } else if (!snap.active || !snap.hasMic) {
-          controls.innerHTML =
-            '<button type="button" class="vbtn vbtn-enable btn-voice-toggle" aria-label="Enable voice chat">' +
-            ICON_CALL + '<span>Enable Voice Chat</span></button>' +
+          controls.innerHTML = (voiceLockCut && !snap.active
+            ? '<button type="button" class="vbtn vbtn-enable btn-voice-reconnect" aria-label="Reconnect voice chat">' +
+              ICON_CALL + '<span>Reconnect Voice Chat</span></button>'
+            : '<button type="button" class="vbtn vbtn-enable btn-voice-toggle" aria-label="Enable voice chat">' +
+              ICON_CALL + '<span>Enable Voice Chat</span></button>') +
             (snap.active
               ? '<button type="button" class="vbtn vbtn-leave btn-voice-leave" aria-label="Leave voice chat">' + ICON_HANGUP + '</button>'
               : '');
@@ -1865,6 +1898,7 @@
           // as Enable Voice and retries the microphone.
           if (session && session.mode === 'online' && !snapM.joining) {
             voiceOptOut = false;
+            voiceLockCut = false;
             V.unlockAudio();
             V.join(session.code, session.playerIdx, session.myName)
               .catch(function (err) { toast(err.message || 'Microphone unavailable', true); });
@@ -1885,9 +1919,23 @@
         renderVoice();
         return;
       }
+      if (ev.target.closest('.btn-voice-reconnect')) {
+        if (!session || session.mode !== 'online') return;
+        // The ONLY way back into voice after a privacy disconnect:
+        // a deliberate tap. This click is the user gesture the mic
+        // prompt and playback unlock need.
+        voiceLockCut = false;
+        voiceOptOut = false;
+        V.unlockAudio();
+        V.join(session.code, session.playerIdx, session.myName)
+          .catch(function (err) { toast(err.message || 'Microphone unavailable', true); });
+        renderVoice();
+        return;
+      }
       if (ev.target.closest('.btn-voice-toggle')) {
         if (!session || session.mode !== 'online') return;
         voiceOptOut = false;
+        voiceLockCut = false;
         // This click is a user gesture — wake the playback context now,
         // before the async mic prompt, so remote audio can play.
         V.unlockAudio();
@@ -2201,6 +2249,7 @@
   }
 
   function goHome() {
+    voiceLockCut = false;
     if (window.AzulVoice) window.AzulVoice.leave();
     dismissRoundOverlay();
     dismissCelebration();
