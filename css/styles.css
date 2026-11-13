@@ -53,6 +53,15 @@ body {
   background-attachment: fixed;
   min-height: 100vh;
   min-height: 100dvh;
+  /* v77: Chrome on iOS zoomed the page in/out on the rapid
+     double-taps of gameplay (pick up tiles, tap a row), which
+     read as "the screen resizes when the turn changes". Safari
+     never did it. touch-action: manipulation disables
+     double-tap zoom while keeping vertical scroll, and
+     text-size-adjust stops WebKit auto-inflating text. */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 /* ---------------------------------------------------------------- header */

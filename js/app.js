@@ -270,6 +270,12 @@
   }
   document.addEventListener('pointerdown', unlockAudio, true);
 
+  // v77: block WebKit's gesture-zoom outright (companion to the
+  // viewport maximum-scale + touch-action rules) so Chrome on iOS
+  // can never rescale the page mid-game.
+  document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+  document.addEventListener('gesturechange', function (e) { e.preventDefault(); });
+
   // One ceramic "clack": a woody knock (pitch-dropping triangle) + a short
   // filtered-noise click, like a tile tapped on a board.
   function ceramicClack(delay, baseFreq, vol) {
